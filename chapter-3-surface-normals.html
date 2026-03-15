@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 3: Surface Normals and Light</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on surface normals, diffuse lighting, and shading with a live WebGL lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-normals">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a class="is-current" href="chapter-3-surface-normals.html" aria-current="page">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 3</p>
+          <p class="sidebar-title">Surface normals and light</p>
+          <p>This is where geometry starts to look like a lit object instead of flat colored triangles.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#lighting-logic">Lighting logic</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask what direction a surface is facing before asking why it looks bright or dark.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 3</p>
+          <h1 class="page-title">Surface normals explain why light changes across a shape</h1>
+          <p class="lede">
+            Shading gets much easier once you stop thinking in terms of “this triangle should be bright” and start
+            thinking in terms of “this surface is facing the light.” Surface normals provide that facing direction.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Core skill</h2>
+              <p>Read a normal as an orientation vector attached to the surface.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Lighting link</h2>
+              <p>Use the dot product between a normal and a light direction to measure alignment.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Debugging habit</h2>
+              <p>If lighting looks wrong, inspect normals before blaming the material.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Diffuse light</span>
+              <code>brightness = max(dot(n, l), 0)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Perfect alignment</span>
+              <code>dot(n, l) = 1</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Facing away</span>
+              <code>dot(n, l) &lt;= 0</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>A normal is not where the surface is. It is how the surface is oriented.</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Normals are directions</h3>
+              <p>They point away from the surface and tell you which way that part of the shape is facing.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Light has a direction too</h3>
+              <p>To decide how much light arrives, compare the light direction to the surface normal.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>The dot product measures alignment</h3>
+              <p>If two vectors point together, the value is large. If they point apart, the value drops.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Interpolated normals smooth the look</h3>
+              <p>Normals can vary across a triangle, which makes a faceted mesh appear smoothly shaded.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lighting-logic">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>How the lighting term is built</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Normalize the normal</h3>
+                <p>Use a unit-length direction so the dot product reports alignment instead of getting mixed up with length.</p>
+              </li>
+              <li>
+                <h3>Normalize the light direction</h3>
+                <p>Now both vectors talk about orientation in the same way.</p>
+              </li>
+              <li>
+                <h3>Take the dot product</h3>
+                <p>This gives a value from about <code>-1</code> to <code>1</code>, depending on how aligned the vectors are.</p>
+              </li>
+              <li>
+                <h3>Clamp negative values</h3>
+                <p>Surfaces facing away from the light should not receive positive diffuse light, so values below zero are clipped.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Non-uniform scale warning</h3>
+                <p>Normals are directions, not positions. Under non-uniform scale, they need a special transform called the inverse transpose.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why visualizing helps</h3>
+                <p>When you draw the normals as lines, lighting bugs often become obvious immediately.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What this unlocks next</h3>
+                <p>Once you know what data a shader needs, the split between vertex and fragment work becomes much easier to follow.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Rotate the light and inspect the normal field directly</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The sphere uses normal-based lighting. The cyan lines show sampled surface normals. Move the light
+                and watch the brightest region slide to the area where the normals align most strongly with it.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Light azimuth</span>
+                  <input id="light-azimuth" type="range" min="-180" max="180" value="38" />
+                </label>
+                <label class="control">
+                  <span>Light elevation</span>
+                  <input id="light-elevation" type="range" min="-20" max="80" value="30" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show normals</span>
+                  <input id="show-normals" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Turn the normals off and try to predict where the brightest area should move before it updates.</li>
+                <li>Turn them back on and confirm that the bright region follows the most aligned normals.</li>
+                <li>Move the light low across the surface and notice how grazing angles reduce the diffuse term.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="normals-canvas" class="canvas-stage" aria-label="Surface normals demo"></canvas>
+              <p class="canvas-caption">Normals are orientation data. Lighting changes because the orientation changes.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should now feel natural</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why a surface can get darker without moving, just because the light direction changed?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating the normal like a point in space instead of a direction that describes orientation.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Normal, dot product, diffuse light, alignment, interpolation, inverse transpose.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-2-coordinate-spaces.html">
+            <span class="page-direction">Back</span>
+            <strong>Coordinate spaces</strong>
+            <p>Return to the pipeline of positions and transforms between spaces.</p>
+          </a>
+          <a class="page-link-card" href="chapter-4-shaders.html">
+            <span class="page-direction">Next</span>
+            <strong>The shader mindset</strong>
+            <p>See where normals, positions, and other values are processed on the GPU.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 3 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 5: Rendering Principles</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on rasterization, depth, sampling, and materials with a live WebGL rendering lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-rendering">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a class="is-current" href="chapter-5-rendering-principles.html" aria-current="page">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 5</p>
+          <p class="sidebar-title">Rendering principles</p>
+          <p>This chapter gathers the earlier ideas into one mental picture of how a final image is formed.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#pipeline">Mental model</a>
+            <a href="#frame">Frame walkthrough</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>When the image looks wrong, ask which stage chose the wrong winner, sample, or color.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 5</p>
+          <h1 class="page-title">Rendering is the process of turning scene data into a trustworthy image</h1>
+          <p class="lede">
+            By this point you have seen transforms, spaces, normals, and shader stages separately. Rendering is where
+            those ideas cooperate. The GPU has to decide which fragments are visible, how they sample data, and what
+            final color they should contribute to the screen.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Rasterization</h2>
+              <p>Triangles become fragments that can be tested and shaded.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Depth</h2>
+              <p>Visibility is usually decided by keeping the fragment with the smallest depth value.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Sampling and materials</h2>
+              <p>Textures, shading models, and color transforms shape the final appearance.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Visibility rule</span>
+              <code>closest depth wins</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Image formation</span>
+              <code>sample -> shade -> display</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Final appearance</span>
+              <code>material + light + view</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="pipeline">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>A frame is a sequence of decisions about geometry, visibility, and color</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Geometry is projected</h3>
+              <p>After transforms and projection, triangles are ready to be turned into screen-space coverage.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Fragments compete for visibility</h3>
+              <p>Depth testing usually decides which fragment represents the front-most visible surface.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Sampling adds detail carefully</h3>
+              <p>Textures are discrete samples, so filtering and resolution matter if you want stable images.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Color needs context</h3>
+              <p>Materials, lighting, tone mapping, and display space all influence the final image that reaches the eye.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="frame">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>What the GPU does during a single draw</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Transform vertices into clip space</h3>
+                <p>The earlier chapters handle this part: model, view, and projection establish where the triangles go.</p>
+              </li>
+              <li>
+                <h3>Rasterize triangles into fragments</h3>
+                <p>The GPU determines which pixel-sized regions are touched by each triangle.</p>
+              </li>
+              <li>
+                <h3>Run fragment shading</h3>
+                <p>Visible candidates receive material, lighting, and texture logic to produce a color.</p>
+              </li>
+              <li>
+                <h3>Resolve visibility and write the result</h3>
+                <p>Depth and blend rules decide whether the fragment updates the frame buffer.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why depth matters</h3>
+                <p>Without depth testing, the final picture often depends on draw order rather than real spatial visibility.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why sampling matters</h3>
+                <p>Textures and screens are grids, so aliasing and filtering are unavoidable topics in real renderers.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why color management matters</h3>
+                <p>If your math happens in the wrong color space, the image can look muddy or too dark even when the geometry is correct.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Turn depth testing on and off to see visibility break</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                Two cubes overlap in screen space. With depth testing enabled, the front-most fragments win. With depth
+                testing disabled, draw order wins instead, which is not the same thing. This is one of the fastest ways
+                to build intuition for why the depth buffer exists.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Layer separation</span>
+                  <input id="pipeline-separation" type="range" min="0" max="100" value="46" />
+                </label>
+                <label class="control">
+                  <span>Spin offset</span>
+                  <input id="pipeline-spin" type="range" min="-80" max="80" value="18" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Depth test</span>
+                  <input id="pipeline-depth" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Turn depth testing off first. The later draw call starts to overwrite fragments that should stay hidden.</li>
+                <li>Reduce layer separation to make the overlap more obvious.</li>
+                <li>Turn depth testing back on and watch the front cube reclaim the correct visible regions.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="pipeline-canvas" class="canvas-stage" aria-label="Rendering pipeline depth demo"></canvas>
+              <p class="canvas-caption">When depth testing is disabled, the image reflects draw order instead of true visibility.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should stay in your head after the course</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why a correct shader can still produce a wrong image if visibility testing is wrong?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating rendering as only a lighting problem. Visibility, sampling, and color space are equally important.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>What to study next</h3>
+              <p>Textures, antialiasing, shadow maps, physically based materials, post-processing, and tone mapping.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-4-shaders.html">
+            <span class="page-direction">Back</span>
+            <strong>The shader mindset</strong>
+            <p>Return to the stage split that feeds the rendering pipeline.</p>
+          </a>
+          <a class="page-link-card" href="chapter-6-cameras-and-projection.html">
+            <span class="page-direction">Next</span>
+            <strong>Cameras and projection</strong>
+            <p>Move from visibility rules into the camera choices that shape the image before rasterization.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 5 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

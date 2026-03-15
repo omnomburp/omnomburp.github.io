@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 9: Shadows and Visibility</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on blockers, visibility, shadow maps, and common shadow artifacts."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-shadows">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a class="is-current" href="chapter-9-shadows-and-visibility.html" aria-current="page">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 9</p>
+          <p class="sidebar-title">Shadows and visibility</p>
+          <p>This chapter treats shadows as a visibility problem: which parts of the scene can the light reach, and which parts are blocked?</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#shadow-map">Shadow map workflow</a>
+            <a href="#artifacts">Artifacts</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>When a shadow is wrong, ask whether the light had the wrong view of the scene or the comparison step used the wrong depth.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 9</p>
+          <h1 class="page-title">A shadow appears wherever the light cannot see the surface</h1>
+          <p class="lede">
+            Once lighting models are in place, the next natural question is why some parts of the scene receive no direct light.
+            The answer is visibility. If an object blocks the path from the light to the surface, that surface point falls into shadow.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Blockers</h2>
+              <p>Objects cast shadows because they stop light from reaching other parts of the scene.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Shadow maps</h2>
+              <p>A common real-time trick is to render the scene from the light’s view first and reuse that depth later.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Artifacts</h2>
+              <p>Shadows are prone to bias issues, resolution problems, and self-shadowing errors.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Shadow test idea</span>
+              <code>is this point farther than light depth?</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">If yes</span>
+              <code>blocked -> in shadow</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">If no</span>
+              <code>visible to light</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Shadows are geometry plus visibility, not a separate decorative effect</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Light behaves like another camera</h3>
+              <p>To ask whether a point is shadowed, you can imagine the scene from the light’s point of view.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>The closest surface to the light wins</h3>
+              <p>If a surface point lies farther away than the light’s stored depth at that pixel, something else blocked it first.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Resolution limits matter</h3>
+              <p>A low-resolution shadow map has to approximate many world-space details with too few samples.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Bias is a balancing act</h3>
+              <p>Too little bias causes self-shadowing acne. Too much bias makes the shadow detach from the caster.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="shadow-map">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>How a basic shadow map pipeline works</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Render depth from the light’s view</h3>
+                <p>This creates a texture that stores the closest visible surface distance for each light-space pixel.</p>
+              </li>
+              <li>
+                <h3>Render the scene normally from the camera</h3>
+                <p>For each visible fragment, transform its world position into the light’s projection space.</p>
+              </li>
+              <li>
+                <h3>Look up the stored light depth</h3>
+                <p>Sample the shadow map at the fragment’s light-space coordinate.</p>
+              </li>
+              <li>
+                <h3>Compare depths</h3>
+                <p>If the fragment is farther than what the light saw first, that fragment is shadowed by a blocker.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why this works</h3>
+                <p>The light’s depth map is a visibility memory: it remembers which surface got there first from the light’s perspective.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Soft shadows</h3>
+                <p>Filtering multiple nearby shadow-map samples can fake penumbra softness, though real soft shadows are more complicated.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why it is hard</h3>
+                <p>You are combining two different camera systems, two projections, and a depth comparison, so small coordinate mistakes show up immediately.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="artifacts">
+          <div class="section-header">
+            <p class="eyebrow">Artifact notebook</p>
+            <h2>The three shadow bugs beginners should learn to recognize quickly</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Shadow acne</h3>
+              <p>The surface shadows itself because the comparison thinks the current point is slightly behind the stored depth due to precision error.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Peter-panning</h3>
+              <p>The shadow appears detached from the object because the bias is so large that the comparison starts missing valid blockers.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Blocky aliasing</h3>
+              <p>The shadow edge looks chunky because the shadow map does not have enough resolution for the projected area.</p>
+            </article>
+          </div>
+
+          <div class="study-grid">
+            <article class="mini-card">
+              <h3>Fix strategy</h3>
+              <p>Simplify first: inspect light-space coordinates, visualize the shadow map, then tune bias and resolution one variable at a time.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Debug question</h3>
+              <p>Does the artifact come from the light pass, the camera pass, the coordinate conversion, or the depth comparison threshold?</p>
+            </article>
+            <article class="mini-card">
+              <h3>What comes next</h3>
+              <p>Ray tracing attacks the same visibility question differently, by shooting rays through the scene instead of projecting triangles onto the screen.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>Questions to answer before the ray tracing comparison</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why a light can be treated like a camera when building a shadow map?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Thinking a shadow map stores darkness. It really stores light-space depth, which is later used for a visibility comparison.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Blocker, occlusion, light space, shadow map, bias, acne, peter-panning, filtering.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-8-materials-and-lighting-models.html">
+            <span class="page-direction">Back</span>
+            <strong>Materials and lighting models</strong>
+            <p>Return to the light-response rules that shadows partially suppress.</p>
+          </a>
+          <a class="page-link-card" href="chapter-10-ray-tracing-and-rasterization.html">
+            <span class="page-direction">Next</span>
+            <strong>Ray tracing and rasterization</strong>
+            <p>Compare two different ways of solving visibility and image formation problems.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 9 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

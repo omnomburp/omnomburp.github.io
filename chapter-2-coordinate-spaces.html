@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 2: Coordinate Spaces</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on object space, world space, view space, and clip space with live WebGL views."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-spaces">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a class="is-current" href="chapter-2-coordinate-spaces.html" aria-current="page">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 2</p>
+          <p class="sidebar-title">Coordinate spaces</p>
+          <p>This chapter turns transforms into a workflow for moving geometry through the graphics pipeline.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#journey">Vertex journey</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask “whose coordinate system am I in right now?” every time you read a position value.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 2</p>
+          <h1 class="page-title">Coordinate spaces are the grammar of a scene</h1>
+          <p class="lede">
+            A graphics pipeline does not move a model directly from “data” to “pixels.” It moves that model through
+            several spaces, each of which makes one job easier. Understanding those spaces is how you stop getting lost
+            in transformation code.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Object space</h2>
+              <p>The model’s own local frame, where the shape is easiest to describe.</p>
+            </article>
+            <article class="mini-card">
+              <h2>World and view space</h2>
+              <p>Place the model in a scene, then reinterpret the scene from the camera’s point of view.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Clip space</h2>
+              <p>Prepare the visible region for normalization and eventual mapping to screen pixels.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Object to world</span>
+              <code>p_world = M p_object</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">World to view</span>
+              <code>p_view = V p_world</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">View to clip</span>
+              <code>p_clip = P p_view</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Each space exists because it makes one transformation problem easier</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Object space keeps modeling simple</h3>
+              <p>A chair can be described around its own origin, regardless of where it later sits in a room.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>World space builds the scene</h3>
+              <p>Models gain meaningful placement relative to one another: left, right, above, behind, and so on.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>View space centers the camera</h3>
+              <p>The camera transform is easier to reason about once the world is expressed relative to the eye.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Clip space prepares for rasterization</h3>
+              <p>Projection compresses the visible region into the canonical box used before fragments are generated.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="journey">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>Follow a single vertex through the pipeline</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Begin in object space</h3>
+                <p>The vertex lives in the model’s own local coordinates. Nothing about the scene or camera matters yet.</p>
+              </li>
+              <li>
+                <h3>Apply the model matrix</h3>
+                <p>This moves the model into world space: translation, rotation, and scale usually happen here.</p>
+              </li>
+              <li>
+                <h3>Apply the view matrix</h3>
+                <p>The whole world is re-expressed from the camera’s frame so “forward,” “left,” and “up” become camera-relative.</p>
+              </li>
+              <li>
+                <h3>Apply projection</h3>
+                <p>Perspective or orthographic projection shapes the visible volume into clip space before normalization.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>The full chain</h3>
+                <p>Most tutorials write this as <code>P * V * M * p</code>. Read it right to left as a sequence of spaces.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why names matter</h3>
+                <p>If a variable is called <code>worldPosition</code>, that name should tell you what operations are still valid on it.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Debugging habit</h3>
+                <p>When geometry disappears, ask which stage likely pushed it out of the visible volume.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Compare the same cube in three different spaces</h2>
+          </div>
+
+          <div class="lab-copy full-width-copy">
+            <p>
+              Rotate the model and compare the three views below. The left panel keeps the cube in its own local frame.
+              The middle panel shows the cube placed into a world. The right panel shows the projected result in the
+              normalized device coordinate box.
+            </p>
+
+            <div class="controls-grid controls-grid-single">
+              <label class="control">
+                <span>Model rotation</span>
+                <input id="space-rotation" type="range" min="-180" max="180" value="18" />
+              </label>
+            </div>
+          </div>
+
+          <div class="space-trio">
+            <article class="mini-canvas-card">
+              <h3>Object space</h3>
+              <p>The cube rotates around its own origin.</p>
+              <div class="canvas-card">
+                <canvas id="space-object-canvas" class="canvas-stage canvas-stage-compact" aria-label="Object space demo"></canvas>
+              </div>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>World space</h3>
+              <p>The object is translated and rotated inside a larger shared scene.</p>
+              <div class="canvas-card">
+                <canvas id="space-world-canvas" class="canvas-stage canvas-stage-compact" aria-label="World space demo"></canvas>
+              </div>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Clip space</h3>
+              <p>The projected coordinates are squeezed into the box used just before screen mapping.</p>
+              <div class="canvas-card">
+                <canvas id="space-clip-canvas" class="canvas-stage canvas-stage-compact" aria-label="Clip space demo"></canvas>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should feel clear before you continue</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why projection should happen after view space, not before object placement?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating “position” as one universal thing instead of a value whose meaning depends on its current space.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Object space, world space, view space, clip space, normalized device coordinates, projection.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-1-vectors.html">
+            <span class="page-direction">Back</span>
+            <strong>Vectors and transforms</strong>
+            <p>Return to the basis-language behind all later coordinate changes.</p>
+          </a>
+          <a class="page-link-card" href="chapter-3-surface-normals.html">
+            <span class="page-direction">Next</span>
+            <strong>Surface normals</strong>
+            <p>Use orientation data to explain how light changes across a surface.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 2 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

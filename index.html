@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Computer Graphics Field Guide</title>
+    <meta
+      name="description"
+      content="A beginner-friendly, multi-page computer graphics course with step-by-step explanations and live WebGL labs."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="home-page">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a class="is-current" href="index.html" aria-current="page">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="home-main">
+      <section class="panel masthead reveal-block" id="top">
+        <div class="masthead-grid">
+          <div class="masthead-copy">
+            <p class="eyebrow">Beginner-first computer graphics course</p>
+            <h1 class="page-title">Learn graphics one chapter at a time, with live WebGL scenes at every stage.</h1>
+            <p class="lede">
+              This site is organized like a course instead of a long landing page. Start with vectors,
+              move through coordinate spaces and surface normals, then continue into cameras, textures,
+              materials, shadows, ray tracing, and final image presentation. Every chapter slows down the
+              explanation and pairs it with an interactive lab or guided technical walkthrough.
+            </p>
+            <div class="action-row">
+              <a class="button button-primary" href="chapter-1-vectors.html">Start Chapter 1</a>
+              <a class="button button-secondary" href="#roadmap">Browse the roadmap</a>
+            </div>
+            <div class="metric-grid" aria-label="Course highlights">
+              <article class="metric-card">
+                <strong>12</strong>
+                <span>separate pages</span>
+              </article>
+              <article class="metric-card">
+                <strong>12</strong>
+                <span>WebGL scenes</span>
+              </article>
+              <article class="metric-card">
+                <strong>0</strong>
+                <span>framework build steps</span>
+              </article>
+            </div>
+          </div>
+
+          <div class="canvas-card canvas-card-hero">
+            <canvas id="hero-canvas" class="canvas-stage canvas-stage-tall" aria-label="Animated WebGL overview scene"></canvas>
+            <div class="canvas-overlay">
+              <article class="overlay-card">
+                <span class="overlay-tag">What the scenes teach</span>
+                <p>Transforms, cameras, sampling, lighting response, visibility, and how geometry becomes a picture.</p>
+              </article>
+              <article class="overlay-card">
+                <span class="overlay-tag">How to study</span>
+                <p>Read slowly, touch the controls, then explain the visual change back in plain language.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel reveal-block" id="roadmap">
+        <div class="section-header">
+          <p class="eyebrow">Course roadmap</p>
+          <h2>Eleven chapters, sequenced from algebra all the way to final image polish</h2>
+          <p>
+            The chapters are sequenced so the intuition from one page supports the next page.
+            You can jump around later, but the first pass should be read in order.
+          </p>
+        </div>
+
+        <div class="chapter-grid">
+          <article class="chapter-card">
+            <span class="chapter-number">01</span>
+            <h3>Vectors, bases, and matrix transforms</h3>
+            <p>Understand coordinates as weights on basis directions and matrices as transformation recipes.</p>
+            <p class="card-note">Lab: transform a triangle with scale and rotation.</p>
+            <a class="card-link" href="chapter-1-vectors.html">Open Chapter 1</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">02</span>
+            <h3>Coordinate spaces</h3>
+            <p>Track a vertex from object space into world, view, clip, and normalized device space.</p>
+            <p class="card-note">Lab: compare object, world, and clip-space views side by side.</p>
+            <a class="card-link" href="chapter-2-coordinate-spaces.html">Open Chapter 2</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">03</span>
+            <h3>Surface normals and light</h3>
+            <p>See why lighting changes across a shape and how normals carry orientation information.</p>
+            <p class="card-note">Lab: rotate the light and inspect the normal vectors directly.</p>
+            <a class="card-link" href="chapter-3-surface-normals.html">Open Chapter 3</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">04</span>
+            <h3>The shader mindset</h3>
+            <p>Separate vertex work from fragment work and understand how varyings move data forward.</p>
+            <p class="card-note">Lab: bend a mesh in the vertex shader and color it in the fragment shader.</p>
+            <a class="card-link" href="chapter-4-shaders.html">Open Chapter 4</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">05</span>
+            <h3>Rendering principles</h3>
+            <p>Connect rasterization, depth, sampling, materials, and color into one mental model.</p>
+            <p class="card-note">Lab: toggle depth testing and watch drawing order break the image.</p>
+            <a class="card-link" href="chapter-5-rendering-principles.html">Open Chapter 5</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">06</span>
+            <h3>Cameras and projection</h3>
+            <p>Understand field of view, orthographic vs perspective projection, and the perspective divide.</p>
+            <p class="card-note">Lab: compare projection types and camera motion on the same scene.</p>
+            <a class="card-link" href="chapter-6-cameras-and-projection.html">Open Chapter 6</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">07</span>
+            <h3>Textures and sampling</h3>
+            <p>Learn what UV coordinates do and why filtering and mip levels matter for stable images.</p>
+            <p class="card-note">Lab: switch between nearest and linear filtering on a procedural texture.</p>
+            <a class="card-link" href="chapter-7-textures-and-sampling.html">Open Chapter 7</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">08</span>
+            <h3>Materials and lighting models</h3>
+            <p>Separate diffuse response, specular highlights, and view-dependent material behavior.</p>
+            <p class="card-note">Lab: tune specular strength and shininess on a lit sphere.</p>
+            <a class="card-link" href="chapter-8-materials-and-lighting-models.html">Open Chapter 8</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">09</span>
+            <h3>Shadows and visibility</h3>
+            <p>Study occlusion, blocker geometry, and the reasons shadows are both essential and fragile.</p>
+            <p class="card-note">Case study: how hidden regions and blockers shape what light can reach.</p>
+            <a class="card-link" href="chapter-9-shadows-and-visibility.html">Open Chapter 9</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">10</span>
+            <h3>Ray tracing and rasterization</h3>
+            <p>Compare the two main rendering mindsets: triangle projection versus ray-scene intersection.</p>
+            <p class="card-note">Comparison: where each approach is strong, weak, and computationally expensive.</p>
+            <a class="card-link" href="chapter-10-ray-tracing-and-rasterization.html">Open Chapter 10</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">11</span>
+            <h3>Color, tone mapping, and post-processing</h3>
+            <p>Finish the course with linear color, gamma, exposure, and the final treatment of an image.</p>
+            <p class="card-note">Lab: adjust exposure and gamma and watch the displayed image respond.</p>
+            <a class="card-link" href="chapter-11-color-tone-mapping-and-post-processing.html">Open Chapter 11</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel reveal-block">
+        <div class="section-header">
+          <p class="eyebrow">How to use the course</p>
+          <h2>Treat each page like a short lesson, not a static article</h2>
+        </div>
+
+        <div class="study-grid">
+          <article class="mini-card">
+            <h3>1. Read the mental model first</h3>
+            <p>Start with the short conceptual framing so the symbols in the rest of the page have a job to do.</p>
+          </article>
+          <article class="mini-card">
+            <h3>2. Walk the steps in order</h3>
+            <p>Each chapter breaks the topic into numbered moves so you are not decoding the whole pipeline at once.</p>
+          </article>
+          <article class="mini-card">
+            <h3>3. Use the lab as a question machine</h3>
+            <p>Change one control, predict the result, then compare your prediction to the picture.</p>
+          </article>
+        </div>
+
+        <div class="callout-grid">
+          <article class="checkpoint-card">
+            <h3>Good study question</h3>
+            <p>What data entered the pipeline, what transformation happened, and why did the image change?</p>
+          </article>
+          <article class="checkpoint-card">
+            <h3>What to avoid</h3>
+            <p>Do not memorize formulas before you know what visual problem each formula is solving.</p>
+          </article>
+          <article class="checkpoint-card">
+            <h3>Best first path</h3>
+            <p>Read Chapters 1 through 7 in order on your first pass, then use Chapters 8 through 11 as the second half of the course.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Built with plain HTML, CSS, JavaScript, and raw WebGL.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

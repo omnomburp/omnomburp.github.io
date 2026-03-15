@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 4: The Shader Mindset</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on vertex shaders, fragment shaders, and GPU thinking with a live WebGL lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-shaders">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a class="is-current" href="chapter-4-shaders.html" aria-current="page">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 4</p>
+          <p class="sidebar-title">The shader mindset</p>
+          <p>This chapter is about dividing work correctly across the GPU pipeline.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#stage-split">Stage split</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Before writing shader code, decide whether the problem belongs to vertices, fragments, or both.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 4</p>
+          <h1 class="page-title">Shaders let the GPU reshape geometry and color the final picture</h1>
+          <p class="lede">
+            A shader is a small program that runs many times on the GPU. The important beginner move is not
+            memorizing syntax. It is learning which stage is responsible for which kind of work.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Vertex shader</h2>
+              <p>Good for moving geometry, preparing varyings, and expressing transforms.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Fragment shader</h2>
+              <p>Good for per-fragment color, lighting, texturing, and pattern generation.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Shared data</h2>
+              <p>Attributes feed vertices, uniforms stay constant for a draw call, and varyings get interpolated.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Vertex output</span>
+              <code>gl_Position = P V M p</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Shared parameter</span>
+              <code>uniform = same for all vertices</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Interpolated value</span>
+              <code>varying -> fragment</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Think in jobs: move geometry first, shade visible fragments later</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Attributes belong to vertices</h3>
+              <p>Position, normal, color, and texture coordinates usually enter the pipeline attached to each vertex.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>The vertex shader prepares geometry</h3>
+              <p>It decides where each vertex goes and which values should be passed forward for interpolation.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Rasterization fills the gaps</h3>
+              <p>The GPU turns transformed triangles into many fragments and blends the varying values across them.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>The fragment shader finishes the look</h3>
+              <p>It receives interpolated values and computes the final color for each visible fragment.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="stage-split">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>Separate vertex work from fragment work clearly</h2>
+          </div>
+
+          <div class="two-column">
+            <div class="note-stack">
+              <pre class="code-block"><code>vertex shader
+  read position
+  bend or move the mesh
+  write gl_Position
+  pass varyings forward
+
+fragment shader
+  read interpolated varyings
+  compute lighting or pattern
+  write final color</code></pre>
+
+              <article class="mini-card">
+                <h3>Useful rule of thumb</h3>
+                <p>If the effect depends on the shape of the mesh, start by asking whether it belongs in the vertex shader.</p>
+              </article>
+            </div>
+
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Move vertices in the vertex shader</h3>
+                <p>Changing position here means the mesh itself changes before triangles are assembled.</p>
+              </li>
+              <li>
+                <h3>Pass values along as varyings</h3>
+                <p>UVs, normals, colors, and custom values can be handed to the fragment stage for interpolation.</p>
+              </li>
+              <li>
+                <h3>Use uniforms for shared controls</h3>
+                <p>Time, camera matrices, light direction, and slider values are usually uniforms.</p>
+              </li>
+              <li>
+                <h3>Shade per fragment</h3>
+                <p>Patterns and lighting belong here because they need high spatial detail across the surface.</p>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Bend the mesh in one stage and color it in the next</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The wave shape comes from the vertex shader. The stripes and drifting color come from the fragment shader.
+                That division is the whole point of the exercise: geometry change first, surface appearance second.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Wave height</span>
+                  <input id="shader-amplitude" type="range" min="5" max="70" value="32" />
+                </label>
+                <label class="control">
+                  <span>Stripe density</span>
+                  <input id="shader-density" type="range" min="4" max="22" value="12" />
+                </label>
+                <label class="control">
+                  <span>Color drift</span>
+                  <input id="shader-shift" type="range" min="0" max="100" value="44" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Turn wave height down to almost zero. The color pattern stays, but the mesh shape becomes flat.</li>
+                <li>Raise stripe density. The geometry stays the same while the fragment-level detail increases.</li>
+                <li>Keep asking which stage created the change you just saw.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="shader-canvas" class="canvas-stage" aria-label="Shader stage demo"></canvas>
+              <p class="canvas-caption">Vertex stage: reshape the surface. Fragment stage: paint the visible result.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>Questions to answer before the rendering chapter</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you name one effect that should start in a vertex shader and one that should start in a fragment shader?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Thinking of shaders as one monolithic program instead of multiple stages with different responsibilities.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Attribute, uniform, varying, vertex shader, fragment shader, rasterization, interpolation.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-3-surface-normals.html">
+            <span class="page-direction">Back</span>
+            <strong>Surface normals</strong>
+            <p>Return to the orientation data that often flows through shader pipelines.</p>
+          </a>
+          <a class="page-link-card" href="chapter-5-rendering-principles.html">
+            <span class="page-direction">Next</span>
+            <strong>Rendering principles</strong>
+            <p>Use the pipeline vocabulary to reason about depth, sampling, and final image formation.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 4 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

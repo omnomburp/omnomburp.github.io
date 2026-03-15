@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 6: Cameras and Projection</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on cameras, field of view, orthographic projection, and perspective with a live WebGL lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-cameras">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a class="is-current" href="chapter-6-cameras-and-projection.html" aria-current="page">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 6</p>
+          <p class="sidebar-title">Cameras and projection</p>
+          <p>This chapter explains why the same geometry can feel wide, compressed, flat, or cinematic depending on the camera model.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#projection-chain">Step by step</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Whenever an image looks distorted, ask whether the cause is camera placement, field of view, or projection type.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 6</p>
+          <h1 class="page-title">A camera is a viewpoint plus a projection rule</h1>
+          <p class="lede">
+            The camera does two jobs. First, it defines where the eye is and what direction it faces. Second, it decides
+            how 3D positions should be mapped onto a 2D image. Perspective projection makes distant objects appear smaller.
+            Orthographic projection keeps parallel size relationships intact.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Field of view</h2>
+              <p>Controls how wide the camera lens feels and how much of the scene can fit into the frame.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Perspective</h2>
+              <p>Objects shrink with distance because the projection divides by depth.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Orthographic</h2>
+              <p>Size stays constant with distance, which is useful for diagrams, CAD, and certain stylized games.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Perspective hint</span>
+              <code>x_screen ~ x / z</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Narrow field of view</span>
+              <code>smaller angle -> zoomed in</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Orthographic rule</span>
+              <code>parallel lines stay parallel</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Projection is not geometry. It is the camera’s rule for making 3D readable on a flat screen.</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>The camera first defines view space</h3>
+              <p>Before projection happens, the scene is re-expressed relative to the eye so “forward” and “distance” are camera-relative ideas.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Perspective compresses with depth</h3>
+              <p>Farther objects contribute smaller image-space values after the perspective divide, which is why the scene feels spatial.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Orthographic ignores distance scaling</h3>
+              <p>It still projects the scene, but it does not shrink distant geometry, so the image feels more diagrammatic than photographic.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Field of view changes framing, not object size in world space</h3>
+              <p>A wider field of view shows more of the scene, but it also exaggerates perspective near the camera.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="projection-chain">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>What the camera and projection matrices are doing</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Choose the eye position</h3>
+                <p>The camera has to know where it is and what it is looking at before any image can be formed.</p>
+              </li>
+              <li>
+                <h3>Build the view transform</h3>
+                <p>This rewrites the world relative to the camera so the eye behaves like the origin of the visible scene.</p>
+              </li>
+              <li>
+                <h3>Pick a projection model</h3>
+                <p>Perspective gives a human-camera feel. Orthographic gives measurement-like consistency.</p>
+              </li>
+              <li>
+                <h3>Map into clip space and divide</h3>
+                <p>After projection, the homogeneous divide turns the 3D coordinates into normalized screen-ready values.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Good beginner distinction</h3>
+                <p>Camera motion changes the frame of reference. Projection changes how depth turns into screen size.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Common bug</h3>
+                <p>If the near plane is too close or the far plane too large, depth precision can get worse than you expect.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why this chapter matters</h3>
+                <p>Once cameras make sense, texture projection, shadow maps, and screen-space effects become easier to organize.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Switch between projection models and change the lens</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The scene contains several cubes at different depths. Narrow the field of view and the view feels zoomed in.
+                Turn on orthographic mode and the depth-based size change disappears, even though the 3D arrangement is the same.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Field of view</span>
+                  <input id="projection-fov" type="range" min="25" max="100" value="56" />
+                </label>
+                <label class="control">
+                  <span>Camera distance</span>
+                  <input id="projection-distance" type="range" min="26" max="70" value="44" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Orthographic mode</span>
+                  <input id="projection-ortho" type="checkbox" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>First leave orthographic mode off and vary only the field of view. Watch how wide-angle perspective stretches space.</li>
+                <li>Then turn orthographic mode on and compare the same geometry without depth-based shrinking.</li>
+                <li>Finally move the camera farther back and ask which visual changes come from camera placement and which from projection type.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="projection-canvas" class="canvas-stage" aria-label="Projection comparison demo"></canvas>
+              <p class="canvas-caption">Projection is the rule that turns 3D depth into a 2D image, not a change to the scene itself.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>Questions to answer before moving to textures</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why perspective makes distant objects smaller while orthographic projection does not?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Using camera distance and field of view interchangeably. They both affect framing, but they are not the same control.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Field of view, near plane, far plane, perspective divide, orthographic projection, clip space.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-5-rendering-principles.html">
+            <span class="page-direction">Back</span>
+            <strong>Rendering principles</strong>
+            <p>Return to visibility and image formation if the camera feels disconnected from the pipeline.</p>
+          </a>
+          <a class="page-link-card" href="chapter-7-textures-and-sampling.html">
+            <span class="page-direction">Next</span>
+            <strong>Textures and sampling</strong>
+            <p>Use the camera model as context for how textured surfaces are sampled on screen.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 6 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 1: Vectors, Bases, and Matrix Transforms</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on vectors, basis directions, and matrix transforms with a live WebGL lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-vectors">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a class="is-current" href="chapter-1-vectors.html" aria-current="page">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 1</p>
+          <p class="sidebar-title">Vectors, bases, and matrices</p>
+          <p>Start here if the words coordinate system, transform, or matrix still feel abstract.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#walkthrough">Step by step</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>When a point moves, ask whether the point changed or whether the coordinate frame changed.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 1</p>
+          <h1 class="page-title">Vectors, bases, and matrix transforms</h1>
+          <p class="lede">
+            Computer graphics begins with a simple question: how do we describe points and directions in space?
+            Vectors answer that question. Bases tell us what the coordinate axes mean. Matrices tell us how to
+            rotate, scale, shear, or otherwise reinterpret those coordinates.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>What you should leave with</h2>
+              <p>Confidence reading a point as weighted basis directions rather than a mysterious pair of numbers.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Main idea</h2>
+              <p>A matrix changes how a shape is interpreted inside a coordinate frame.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Why it matters</h2>
+              <p>Everything later in graphics depends on moving data between spaces without losing track of meaning.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Coordinates as weights</span>
+              <code>p = x i + y j</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Transform a point</span>
+              <code>p' = M p</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Order matters</span>
+              <code>B(Ap) != A(Bp)</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Think of coordinates as instructions for rebuilding a point from basis directions</h2>
+            <p>
+              The numbers inside a vector are not meaningful by themselves. They only become meaningful after you
+              decide what the basis directions are. In graphics, changing the basis is often just as important as
+              changing the point.
+            </p>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>A vector is direction plus magnitude</h3>
+              <p>Picture an arrow. Its orientation tells you where it points, and its length tells you how much movement it represents.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>A basis picks the local language</h3>
+              <p>The usual 2D basis is “one step right” and “one step up,” but you are free to rotate or stretch that language.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Coordinates are basis weights</h3>
+              <p>If a point is <code>(2, 1)</code>, read that as “two copies of the x basis plus one copy of the y basis.”</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>A matrix changes the frame</h3>
+              <p>Rotation, scaling, and shearing can all be seen as changing the basis vectors used to rebuild the point.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="walkthrough">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>Walk one point through a transform chain</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Start with a local point</h3>
+                <p>Imagine the point <code>(1, 0.5)</code> inside a triangle. In its original basis, that means one unit along x and half a unit along y.</p>
+              </li>
+              <li>
+                <h3>Scale the basis</h3>
+                <p>If the x basis doubles in length, every x coordinate effectively covers more space. The shape widens without rewriting every vertex by hand.</p>
+              </li>
+              <li>
+                <h3>Rotate the basis</h3>
+                <p>Now turn those basis directions. The same coordinate weights now rebuild the point in a new orientation.</p>
+              </li>
+              <li>
+                <h3>Compose transforms carefully</h3>
+                <p>Scaling and then rotating is not the same as rotating and then scaling, because the second transform acts on the output of the first.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Say it in plain language</h3>
+                <p>“This matrix changes the axes, so the same shape coordinates now produce a different picture.”</p>
+              </article>
+              <article class="mini-card">
+                <h3>Beginner trap</h3>
+                <p>Do not think of matrices as arbitrary tables of numbers. Treat them as compact descriptions of geometric behavior.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What this unlocks next</h3>
+                <p>Once transforms feel natural, moving from object space to world space becomes much less intimidating.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Use the controls to see the basis change in real time</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The pale triangle is the original object. The bright triangle is the transformed version.
+                The axes attached to the transformed object show the new basis directions after the matrix is applied.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Rotation</span>
+                  <input id="vector-rotation" type="range" min="-180" max="180" value="24" />
+                </label>
+                <label class="control">
+                  <span>Stretch X</span>
+                  <input id="vector-scale-x" type="range" min="40" max="180" value="116" />
+                </label>
+                <label class="control">
+                  <span>Stretch Y</span>
+                  <input id="vector-scale-y" type="range" min="40" max="180" value="92" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Set both stretch sliders to <code>100</code> and rotate the object. That isolates pure rotation.</li>
+                <li>Set rotation to <code>0</code> and change one stretch slider at a time. That isolates basis length changes.</li>
+                <li>Combine both and notice how the local axes move with the transformed shape, not with the world grid.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="vectors-canvas" class="canvas-stage" aria-label="Vector transform demo"></canvas>
+              <p class="canvas-caption">The world grid stays fixed while the transform matrix changes the object’s local frame.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>Questions you should be able to answer before moving on</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain what a point like <code>(3, 2)</code> means without saying “just x and y”?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Forgetting that transform order matters. A later matrix acts on the already-transformed result.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Vector, basis, coordinate frame, transform, scale, rotation, shear, composition.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="index.html">
+            <span class="page-direction">Back</span>
+            <strong>Course overview</strong>
+            <p>Return to the roadmap and study guidance.</p>
+          </a>
+          <a class="page-link-card" href="chapter-2-coordinate-spaces.html">
+            <span class="page-direction">Next</span>
+            <strong>Coordinate spaces</strong>
+            <p>Use transforms to move geometry between object, world, view, and clip space.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 1 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

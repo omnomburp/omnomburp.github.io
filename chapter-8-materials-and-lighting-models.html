@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 8: Materials and Lighting Models</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on diffuse and specular lighting, view dependence, and material response with a live WebGL lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-materials">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a class="is-current" href="chapter-8-materials-and-lighting-models.html" aria-current="page">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 8</p>
+          <p class="sidebar-title">Materials and lighting models</p>
+          <p>This chapter connects geometry and light to the question “what kind of surface is this supposed to feel like?”</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#lighting-pieces">Step by step</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask which part of the look depends on the light and which part depends on the view direction.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 8</p>
+          <h1 class="page-title">A material is a rule for how a surface responds to light and to the viewer</h1>
+          <p class="lede">
+            Diffuse light explains broad brightness changes, but it does not explain shiny highlights, glints, or why some
+            surfaces look matte and others look polished. A lighting model combines multiple terms so the surface can respond
+            to both the light direction and the eye direction.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Diffuse response</h2>
+              <p>This is the broad light term controlled mainly by normal-light alignment.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Specular response</h2>
+              <p>This creates concentrated highlights that depend strongly on view direction.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Material feel</h2>
+              <p>Changing roughness, shininess, and balance between terms changes whether a surface feels soft, glossy, or sharp.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Diffuse term</span>
+              <code>max(dot(n, l), 0)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Specular idea</span>
+              <code>highlight depends on view</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Shininess</span>
+              <code>higher power -> tighter highlight</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Lighting models split the look into parts so each visual behavior has a reason</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Diffuse handles broad illumination</h3>
+              <p>This is the part that tracks whether the surface faces toward the light source.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Specular handles glossy reflection</h3>
+              <p>The highlight moves as the camera moves because it depends on both light direction and view direction.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Ambient or fill terms keep shadows readable</h3>
+              <p>Real scenes often have bounced light, so pure black shadows are usually too simple for a convincing result.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Material parameters shape the feel</h3>
+              <p>A broader highlight can feel rougher. A tighter one can feel more polished or harder.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lighting-pieces">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>Build a beginner-friendly lighting model in layers</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Start with a base color</h3>
+                <p>The material usually has a diffuse albedo or base color that describes its broad tint under light.</p>
+              </li>
+              <li>
+                <h3>Add diffuse light</h3>
+                <p>Use the normal-light alignment to decide how strongly the base color should respond.</p>
+              </li>
+              <li>
+                <h3>Add a specular highlight</h3>
+                <p>Now compute a view-dependent term that creates the glossy concentrated bright spot.</p>
+              </li>
+              <li>
+                <h3>Tune the balance</h3>
+                <p>Changing specular strength and shininess does not move the geometry. It changes the story the light tells about the surface.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Blinn-Phong intuition</h3>
+                <p>Many beginner renderers use Blinn-Phong because it is simple, stable, and good enough to teach diffuse plus specular logic.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Real materials are richer</h3>
+                <p>Physically based shading adds more accurate energy behavior, roughness handling, and material categories, but the same intuition still helps.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What comes next</h3>
+                <p>Once a surface response is clear, the next challenge is explaining how blockers stop light and create shadowed regions.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Tune diffuse and specular behavior on a sphere</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The sphere below keeps the same shape while you change only its lighting response. Increase the specular strength
+                to create a brighter highlight. Increase shininess to tighten that highlight into a smaller glossier patch.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Specular strength</span>
+                  <input id="material-specular" type="range" min="0" max="100" value="48" />
+                </label>
+                <label class="control">
+                  <span>Shininess</span>
+                  <input id="material-shininess" type="range" min="6" max="96" value="36" />
+                </label>
+                <label class="control">
+                  <span>Light orbit</span>
+                  <input id="material-light" type="range" min="-180" max="180" value="32" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Lower specular strength to zero and observe that the highlight disappears even though diffuse shading remains.</li>
+                <li>Raise shininess and watch the bright region tighten into a smaller sharper reflection.</li>
+                <li>Rotate the light and notice that the highlight position depends on both the surface normal and the view direction.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="material-canvas" class="canvas-stage" aria-label="Material lighting demo"></canvas>
+              <p class="canvas-caption">The geometry does not change. The apparent material changes because the light-response rule changes.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should be clear before shadows</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why a highlight can move across a surface when the camera moves, even if the light stays fixed?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating specular light as “extra diffuse” instead of a distinct view-dependent term.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Diffuse, specular, shininess, highlight, view direction, Blinn-Phong, material response.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-7-textures-and-sampling.html">
+            <span class="page-direction">Back</span>
+            <strong>Textures and sampling</strong>
+            <p>Return to the sampled data that often feeds material and shading calculations.</p>
+          </a>
+          <a class="page-link-card" href="chapter-9-shadows-and-visibility.html">
+            <span class="page-direction">Next</span>
+            <strong>Shadows and visibility</strong>
+            <p>Use the light-response intuition here to reason about where light should fail to reach.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 8 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

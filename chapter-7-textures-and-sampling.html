@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 7: Textures and Sampling</title>
+    <meta
+      name="description"
+      content="Step-by-step beginner lesson on UV coordinates, texture lookup, and filtering with a live WebGL sampling lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-textures">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a class="is-current" href="chapter-7-textures-and-sampling.html" aria-current="page">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 7</p>
+          <p class="sidebar-title">Textures and sampling</p>
+          <p>This chapter explains how image data gets attached to a surface and why the sampling rule matters just as much as the texture itself.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#uv-walkthrough">Step by step</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Whenever a texture looks noisy or blocky, ask whether the problem is the image itself or the way it is being sampled.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 7</p>
+          <h1 class="page-title">Textures are sampled data attached to geometry through UV coordinates</h1>
+          <p class="lede">
+            Textures are not pasted onto geometry by magic. Each vertex carries UV coordinates that describe how to look up
+            values inside a texture image. Then the GPU samples between those texels according to a filtering rule.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>UV coordinates</h2>
+              <p>These are 2D lookup coordinates that travel with the mesh and tell the shader where to sample.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Filtering</h2>
+              <p>Nearest keeps hard texel boundaries. Linear blends nearby texels and looks smoother.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Sampling artifacts</h2>
+              <p>Aliasing appears when a dense pattern is projected onto too few pixels without enough filtering support.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Texture lookup</span>
+              <code>color = texture(uv)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Repeat pattern</span>
+              <code>uv_scaled = uv * k</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Filtering choice</span>
+              <code>nearest vs linear</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>A texture is just a table of samples until a surface tells the GPU how to read it</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>The mesh carries UV coordinates</h3>
+              <p>Every vertex can store a matching point in texture space so the surface knows what part of the image it should use.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Rasterization interpolates UVs</h3>
+              <p>Fragments inside a triangle receive UV values blended from the triangle’s vertices.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>The shader samples the texture</h3>
+              <p>That UV coordinate is used to fetch or blend texel values from the texture image.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Filtering controls the visual tradeoff</h3>
+              <p>Sharp texel edges can look crisp or noisy. Blended filtering looks smoother but can soften detail.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="uv-walkthrough">
+          <div class="section-header">
+            <p class="eyebrow">Step by step</p>
+            <h2>How a texture sample reaches the final image</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Author or generate UVs</h3>
+                <p>The mesh needs a mapping from its surface into 2D texture space.</p>
+              </li>
+              <li>
+                <h3>Pass UVs from the vertex shader</h3>
+                <p>The vertex shader forwards them as varyings so the fragment stage can see them.</p>
+              </li>
+              <li>
+                <h3>Sample the texture in the fragment shader</h3>
+                <p>The fragment shader asks for the texture value at the interpolated UV location.</p>
+              </li>
+              <li>
+                <h3>Filter according to scale and mode</h3>
+                <p>When the surface is steep or far away, one on-screen pixel may cover many texels, which is where sampling problems begin.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>What mipmaps solve</h3>
+                <p>If the texture pattern gets much smaller than a pixel, prefiltered mip levels help stop high-frequency flicker.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why UV seams happen</h3>
+                <p>A 3D surface often has to be cut apart when flattened into 2D texture space, just like an orange peel.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What comes next</h3>
+                <p>Materials decide how sampled textures, normals, and light directions combine into a final shaded surface.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Change UV frequency and filtering on a textured plane</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                This plane uses a procedural checker texture. Increase the UV repeat count to force more texture detail onto fewer pixels.
+                Then switch between nearest and linear filtering and notice how the texture either holds hard texel boundaries or blends them.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>UV repeat</span>
+                  <input id="texture-scale" type="range" min="1" max="18" value="8" />
+                </label>
+                <label class="control">
+                  <span>Surface tilt</span>
+                  <input id="texture-tilt" type="range" min="12" max="76" value="48" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Linear filtering</span>
+                  <input id="texture-linear" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Increase UV repeat until the checker becomes dense. That forces the sampler to work harder.</li>
+                <li>Lower the tilt so the plane becomes more grazing to the camera. That increases minification artifacts.</li>
+                <li>Toggle linear filtering and note that it smooths the pattern but also softens the texel boundaries.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="texture-canvas" class="canvas-stage" aria-label="Texture sampling demo"></canvas>
+              <p class="canvas-caption">The texture is the same in every case. The visible difference comes from the sampling rule.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should feel clear before materials</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain the difference between a texture image, a UV coordinate, and a sampling filter?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Blaming the texture art when the real problem is poor filtering or too much pattern density for the screen resolution.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>UV, texel, interpolation, nearest filter, linear filter, minification, mipmaps.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-6-cameras-and-projection.html">
+            <span class="page-direction">Back</span>
+            <strong>Cameras and projection</strong>
+            <p>Return to the image formation rules that determine how textured surfaces appear on screen.</p>
+          </a>
+          <a class="page-link-card" href="chapter-8-materials-and-lighting-models.html">
+            <span class="page-direction">Next</span>
+            <strong>Materials and lighting models</strong>
+            <p>Use sampled data and normals together to decide how a surface should respond to light.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 7 of 11.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

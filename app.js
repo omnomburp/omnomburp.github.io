@@ -925,6 +925,46 @@ function drawLessonCanvasPanel(ctx, rect, title, width) {
   ctx.restore();
 }
 
+function drawCanvasChip(ctx, text, x, y, options = {}) {
+  if (!text) {
+    return;
+  }
+
+  const fontSize = options.fontSize || 11;
+  const paddingX = options.paddingX || Math.max(6, fontSize * 0.52);
+  const paddingY = options.paddingY || Math.max(3, fontSize * 0.26);
+  const align = options.align || "center";
+
+  ctx.save();
+  ctx.font = `${fontSize}px "Avenir Next", "Segoe UI", sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+  const textWidth = ctx.measureText(text).width;
+  const chipWidth = textWidth + paddingX * 2;
+  const chipHeight = fontSize + paddingY * 2;
+
+  let chipX = x;
+  if (align === "center") {
+    chipX -= chipWidth * 0.5;
+  } else if (align === "right") {
+    chipX -= chipWidth;
+  }
+
+  let chipY = y - chipHeight * 0.5;
+  chipX = Math.min(Math.max(chipX, 4), Math.max(4, ctx.canvas.width - chipWidth - 4));
+  chipY = Math.min(Math.max(chipY, 4), Math.max(4, ctx.canvas.height - chipHeight - 4));
+
+  ctx.fillStyle = options.background || "rgba(8, 21, 30, 0.8)";
+  ctx.fillRect(chipX, chipY, chipWidth, chipHeight);
+  ctx.strokeStyle = options.border || "rgba(255, 255, 255, 0.14)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(chipX + 0.5, chipY + 0.5, chipWidth - 1, chipHeight - 1);
+  ctx.fillStyle = options.color || "rgba(239, 245, 247, 0.94)";
+  ctx.fillText(text, chipX + paddingX, chipY + chipHeight * 0.5 + 0.5);
+  ctx.restore();
+}
+
 function drawArrow2d(ctx, from, to, color, lineWidth = 2.2) {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
@@ -3468,90 +3508,45 @@ function setupClipStoryDemo() {
 
       drawLessonCanvasBackground(ctx, width, height);
 
-      const titleLineHeight = Math.max(14, width * 0.014 * 1.18);
-      const bodyLineHeight = Math.max(13, width * 0.0118 * 1.34);
-      const titleFont = `${Math.max(11, width * 0.014)}px "Avenir Next", "Segoe UI", sans-serif`;
-      const bodyFont = `${Math.max(10, width * 0.0118)}px "Avenir Next", "Segoe UI", sans-serif`;
-
-      function measureTextBlock(lines, maxWidth, lineHeight) {
-        const items = Array.isArray(lines) ? lines : [lines];
-        let totalLines = 0;
-        for (const line of items) {
-          totalLines += wrapCanvasTextLine(ctx, line, maxWidth).length;
-        }
-        return totalLines * lineHeight;
-      }
-
       function drawConnector(fromRect, toRect, label) {
         ctx.save();
         ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-        ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
-        ctx.font = bodyFont;
+        let start;
+        let end;
         if (stacked) {
-          const start = [fromRect.x + fromRect.width * 0.5, fromRect.y + fromRect.height + 5];
-          const end = [toRect.x + toRect.width * 0.5, toRect.y - 5];
+          start = [fromRect.x + fromRect.width * 0.5, fromRect.y + fromRect.height + 5];
+          end = [toRect.x + toRect.width * 0.5, toRect.y - 5];
           drawArrow2d(ctx, start, end, "rgba(255, 255, 255, 0.18)", Math.max(1.6, width * 0.0025));
-          drawTextLines(ctx, [label], start[0] + 12, (start[1] + end[1]) * 0.5 - bodyLineHeight * 0.5, bodyLineHeight, Math.max(80, width * 0.24));
         } else {
-          const start = [fromRect.x + fromRect.width + 8, fromRect.y + fromRect.height * 0.5];
-          const end = [toRect.x - 8, toRect.y + toRect.height * 0.5];
+          start = [fromRect.x + fromRect.width + 8, fromRect.y + fromRect.height * 0.5];
+          end = [toRect.x - 8, toRect.y + toRect.height * 0.5];
           drawArrow2d(ctx, start, end, "rgba(255, 255, 255, 0.18)", Math.max(1.6, width * 0.0025));
-          ctx.textAlign = "center";
-          drawTextLines(ctx, [label], (start[0] + end[0]) * 0.5 - Math.max(52, width * 0.08), start[1] - bodyLineHeight * 1.5, bodyLineHeight, Math.max(104, width * 0.12));
-          ctx.textAlign = "left";
         }
+        drawCanvasChip(ctx, label, (start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, {
+          fontSize: Math.max(10, width * 0.013),
+        });
         ctx.restore();
       }
 
-      function drawPanelFrame(rect, title, subtitle, footerLines) {
-        const maxTextWidth = rect.width - 24;
-        const subtitleLines = Array.isArray(subtitle) ? subtitle : [subtitle];
-        const footer = Array.isArray(footerLines) ? footerLines : [footerLines];
-        const titleHeight = measureTextBlock([title], maxTextWidth, titleLineHeight);
-        const subtitleHeight = measureTextBlock(subtitleLines, maxTextWidth, bodyLineHeight);
-        const footerHeight = measureTextBlock(footer, maxTextWidth, bodyLineHeight);
-        const contentTop = rect.y + 12;
-        const footerTop = rect.y + rect.height - 12 - footerHeight;
-        const plotTop = contentTop + titleHeight + 4 + subtitleHeight + 10;
-        const plotBottom = footerTop - 10;
-
-        ctx.fillStyle = "rgba(8, 21, 30, 0.22)";
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
-        ctx.font = titleFont;
-        drawTextLines(ctx, [title], rect.x + 12, contentTop, titleLineHeight, maxTextWidth);
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.78)";
-        ctx.font = bodyFont;
-        drawTextLines(ctx, subtitleLines, rect.x + 12, contentTop + titleHeight + 4, bodyLineHeight, maxTextWidth);
-        drawTextLines(ctx, footer, rect.x + 12, footerTop, bodyLineHeight, maxTextWidth);
-
+      function drawPanelFrame(rect, title) {
+        drawLessonCanvasPanel(ctx, rect, title, width);
         return {
           x: rect.x + 12,
-          y: plotTop,
+          y: rect.y + 34,
           width: rect.width - 24,
-          height: Math.max(36, plotBottom - plotTop),
+          height: rect.height - 46,
         };
       }
 
-      drawConnector(rects[0], rects[1], "Project");
-      drawConnector(rects[1], rects[2], "Divide by w");
+      drawConnector(rects[0], rects[1], "P");
+      drawConnector(rects[1], rects[2], "/w");
 
       function drawViewSpace(rect) {
         const fov = degreesToRadians(58);
         const near = 0.5;
         const far = 6.2;
         const maxHalfWidth = Math.tan(fov / 2) * far;
-        const plot = drawPanelFrame(
-          rect,
-          "View space",
-          "Camera-relative position before projection.",
-          `p_view = ${formatVector(pointView, 2)}`,
-        );
+        const plot = drawPanelFrame(rect, "View");
 
         function toCanvas(point) {
           const x = point[0];
@@ -3589,12 +3584,7 @@ function setupClipStoryDemo() {
       }
 
       function drawClipSpace(rect) {
-        const plot = drawPanelFrame(
-          rect,
-          "Clip space",
-          "Projection output. The point still keeps w.",
-          [`p_clip = ${formatVector(clip, 2)}`, `clip test uses +/-w = +/-${formatNumber(clip[3], 2)}`],
-        );
+        const plot = drawPanelFrame(rect, "Clip");
         const extent = Math.max(1.2, Math.abs(clip[3]) * 1.25, Math.abs(clip[0]) * 1.15, Math.abs(clip[1]) * 1.15);
 
         function toCanvas(point) {
@@ -3622,6 +3612,11 @@ function setupClipStoryDemo() {
         ctx.strokeStyle = "rgba(248, 179, 125, 0.94)";
         ctx.lineWidth = Math.max(1.8, width * 0.0028);
         ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        drawCanvasChip(ctx, "w-box", plot.x + plot.width - 12, plot.y + 16, {
+          align: "right",
+          fontSize: Math.max(10, width * 0.0125),
+          color: "rgba(248, 179, 125, 0.98)",
+        });
 
         const pointCanvas = toCanvas([clip[0], clip[1]]);
         ctx.fillStyle = "#f8b37d";
@@ -3631,12 +3626,7 @@ function setupClipStoryDemo() {
       }
 
       function drawNdc(rect) {
-        const plot = drawPanelFrame(
-          rect,
-          "NDC",
-          "The same point after divide by w.",
-          [`p_ndc = ${formatVector(ndc, 2)}`, "fixed box is always [-1, 1]"],
-        );
+        const plot = drawPanelFrame(rect, "NDC");
         const extent = 1.15;
 
         function toCanvas(point) {
@@ -3663,6 +3653,11 @@ function setupClipStoryDemo() {
         ctx.strokeStyle = "rgba(115, 221, 213, 0.92)";
         ctx.lineWidth = Math.max(1.8, width * 0.0028);
         ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        drawCanvasChip(ctx, "[-1,1]", plot.x + plot.width - 12, plot.y + 16, {
+          align: "right",
+          fontSize: Math.max(10, width * 0.0125),
+          color: "rgba(115, 221, 213, 0.98)",
+        });
 
         const pointCanvas = toCanvas([ndc[0], ndc[1]]);
         ctx.fillStyle = "#73ddd5";
@@ -7372,13 +7367,24 @@ function setupBasisStoryDemo() {
       ctx.beginPath();
       ctx.arc(pointCanvas[0], pointCanvas[1], Math.max(6.5, width * 0.0115), 0, TAU);
       ctx.fill();
+      const chipFont = Math.max(10, width * 0.0135);
+      drawCanvasChip(ctx, "i", basisICanvas[0] + 14, basisICanvas[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "j", basisJCanvas[0] + 14, basisJCanvas[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+      drawCanvasChip(ctx, `${formatNumber(weights[0], 1)}i`, weightedICanvas[0] + 18, weightedICanvas[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "p", pointCanvas[0] + 16, pointCanvas[1] - 16, {
+        fontSize: chipFont,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
 
-      ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
-      ctx.font = `${Math.max(12, width * 0.022)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText("weights = (1.20, 0.65)", 18, 26);
-      ctx.fillText("1.20 * i", weightedICanvas[0] + 10, weightedICanvas[1] - 10);
-      ctx.fillText("0.65 * j", pointCanvas[0] + 10, pointCanvas[1] - 10);
-      ctx.fillText("same weights, new rebuilt point", 18, height - 18);
     },
   });
 }
@@ -7494,10 +7500,22 @@ function setupHomogeneousStoryDemo() {
         ctx.beginPath();
         ctx.arc(resultCanvas[0], resultCanvas[1], Math.max(7, width * 0.009), 0, TAU);
         ctx.stroke();
+        const chipFont = Math.max(10, width * 0.0135);
+        drawCanvasChip(ctx, "t", translationCanvas[0] + 12, translationCanvas[1] - 12, {
+          fontSize: chipFont,
+          color: "rgba(255, 223, 132, 0.98)",
+        });
+        drawCanvasChip(ctx, isPoint ? "p" : "d", localCanvas[0] + 14, localCanvas[1] - 14, {
+          fontSize: chipFont,
+          color: "rgba(247, 160, 74, 0.98)",
+        });
+        if (isPoint) {
+          drawCanvasChip(ctx, "p+t", resultCanvas[0] + 16, resultCanvas[1] + 14, {
+            fontSize: chipFont,
+            color: "rgba(115, 221, 213, 0.98)",
+          });
+        }
 
-        ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
-        ctx.font = `${Math.max(10, width * 0.013)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.fillText(isPoint ? "translation applies" : "translation ignored", rect.x + 14, rect.y + rect.height - 14);
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7511,12 +7529,12 @@ function setupHomogeneousStoryDemo() {
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, width, height);
 
-      drawPanel({ x: margin, y: margin, width: panelWidth, height: panelHeight }, "Point, w = 1", true);
+      drawPanel({ x: margin, y: margin, width: panelWidth, height: panelHeight }, "w = 1", true);
       drawPanel(
         stacked
           ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
           : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight },
-        "Direction, w = 0",
+        "w = 0",
         false
       );
     },
@@ -7646,9 +7664,6 @@ function setupOrderStoryDemo() {
         ctx.arc(third[0], third[1], Math.max(6, width * 0.009), 0, TAU);
         ctx.fill();
 
-        ctx.fillStyle = "rgba(239, 245, 247, 0.84)";
-        ctx.font = `${Math.max(10, width * 0.013)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.fillText(order === "scale-rotate" ? "S -> R" : "R -> S", rect.x + 14, rect.y + rect.height - 14);
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7664,7 +7679,7 @@ function setupOrderStoryDemo() {
 
       drawPanel(
         { x: margin, y: margin, width: panelWidth, height: panelHeight },
-        "Scale then rotate",
+        "S then R",
         "scale-rotate",
         "rgba(115, 221, 213, 0.96)"
       );
@@ -7672,7 +7687,7 @@ function setupOrderStoryDemo() {
         stacked
           ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
           : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight },
-        "Rotate then scale",
+        "R then S",
         "rotate-scale",
         "rgba(247, 160, 74, 0.96)"
       );
@@ -7887,10 +7902,23 @@ function setupBasisProbeDemo() {
       ctx.stroke();
 
       const localCanvas = toCanvas(local);
+      const chipFont = Math.max(10, width * 0.0135);
       ctx.fillStyle = "#f7a04a";
       ctx.beginPath();
       ctx.arc(localCanvas[0], localCanvas[1], Math.max(6, width * 0.012), 0, TAU);
       ctx.fill();
+      drawCanvasChip(ctx, "i", basisI[0] + 14, basisI[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(255, 196, 104, 0.98)",
+      });
+      drawCanvasChip(ctx, "j", basisJ[0] + 14, basisJ[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(110, 226, 201, 0.98)",
+      });
+      drawCanvasChip(ctx, "p", localCanvas[0] + 16, localCanvas[1] - 16, {
+        fontSize: chipFont,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
 
       if (useTranslation) {
         const resultCanvas = toCanvas(result);
@@ -7907,16 +7935,15 @@ function setupBasisProbeDemo() {
         ctx.lineTo(resultCanvas[0], resultCanvas[1]);
         ctx.stroke();
         ctx.setLineDash([]);
-      }
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-      ctx.font = `${Math.max(12, width * 0.026)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText("i basis", basisI[0] + 10, basisI[1] - 10);
-      ctx.fillText("j basis", basisJ[0] + 10, basisJ[1] - 10);
-      ctx.fillText("local point", localCanvas[0] + 12, localCanvas[1] - 10);
-      if (useTranslation) {
-        const resultCanvas = toCanvas(result);
-        ctx.fillText("translated point", resultCanvas[0] + 12, resultCanvas[1] + 16);
+        const translatedOrigin = toCanvas(translation);
+        drawCanvasChip(ctx, "t", translatedOrigin[0] + 12, translatedOrigin[1] - 12, {
+          fontSize: chipFont,
+          color: "rgba(255, 223, 132, 0.98)",
+        });
+        drawCanvasChip(ctx, "p+t", resultCanvas[0] + 16, resultCanvas[1] - 16, {
+          fontSize: chipFont,
+          color: "rgba(115, 221, 213, 0.98)",
+        });
       }
 
       if (readouts.local) {
@@ -8092,17 +8119,6 @@ function setupSpaceProbeDemo() {
       ctx.strokeStyle = "rgba(255, 255, 255, 0.94)";
       ctx.lineWidth = Math.max(1.6, width * 0.003);
       ctx.stroke();
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-      ctx.font = `${Math.max(12, width * 0.023)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText(stageNames[stage], 18, 24);
-      if (stage === 3) {
-        ctx.fillText(`visible if -w <= x,y,z <= w with w = ${formatNumber(clip[3], 2)}`, 18, height - 18);
-      } else if (stage === 4) {
-        ctx.fillText("NDC is the post-divide coordinate inside the fixed [-1, 1] box.", 18, height - 18);
-      } else {
-        ctx.fillText("The same vertex is being interpreted in a different frame.", 18, height - 18);
-      }
 
       if (label) {
         label.textContent = stageNames[stage];
@@ -8366,6 +8382,7 @@ function setupVectorsCodeLab() {
 
       const basisI = toCanvas(derived.basisI);
       const basisJ = toCanvas(derived.basisJ);
+      const chipFont = Math.max(10, width * 0.0135);
       ctx.lineWidth = Math.max(2.2, width * 0.0042);
       ctx.strokeStyle = "rgba(247, 160, 74, 0.96)";
       ctx.beginPath();
@@ -8414,24 +8431,29 @@ function setupVectorsCodeLab() {
       ctx.beginPath();
       ctx.arc(local[0], local[1], Math.max(5.4, width * 0.0105), 0, TAU);
       ctx.fill();
+      drawCanvasChip(ctx, "i", basisI[0] + 14, basisI[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "j", basisJ[0] + 14, basisJ[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+      drawCanvasChip(ctx, "p", local[0] + 16, local[1] - 16, {
+        fontSize: chipFont,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      if (Math.abs(derived.values.point_w) >= 1e-6) {
+        drawCanvasChip(ctx, "w*t", (local[0] + world[0]) * 0.5, (local[1] + world[1]) * 0.5 - 14, {
+          fontSize: chipFont,
+          color: "rgba(255, 223, 132, 0.98)",
+        });
+        drawCanvasChip(ctx, "p'", world[0] + 16, world[1] - 16, {
+          fontSize: chipFont,
+          color: "rgba(115, 221, 213, 0.98)",
+        });
+      }
 
-      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-      ctx.font = `${Math.max(12, width * 0.024)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText("i basis", basisI[0] + 10, basisI[1] - 10);
-      ctx.fillText("j basis", basisJ[0] + 10, basisJ[1] - 10);
-      ctx.fillText("local", local[0] + 12, local[1] - 10);
-      ctx.fillText(
-        Math.abs(derived.values.point_w) < 1e-6 ? "world = local" : "world",
-        world[0] + 12,
-        world[1] + 16
-      );
-      ctx.fillText(
-        Math.abs(derived.values.point_w) < 1e-6
-          ? "w = 0 keeps the affine offset out of the point."
-          : "Reconstruct first, then add translate * w.",
-        18,
-        height - 18
-      );
     },
   });
 }
@@ -8755,15 +8777,6 @@ function setupSpacesCodeLab() {
         ctx.arc(point[0], point[1], Math.max(4.5, width * 0.0065), 0, TAU);
         ctx.fill();
 
-        if (stage.label === "NDC") {
-          ctx.fillStyle = "rgba(239, 245, 247, 0.84)";
-          ctx.font = `${Math.max(9, width * 0.0115)}px "Avenir Next", "Segoe UI", sans-serif`;
-          ctx.fillText(
-            `${Math.round(derived.pixel[0])}, ${Math.round(derived.pixel[1])}`,
-            rect.x + 12,
-            rect.y + rect.height - 10
-          );
-        }
       }
     },
   });
@@ -8935,6 +8948,19 @@ function drawNormalCodeLab(ctx, canvas, derived) {
   ctx.moveTo(center[0], center[1]);
   ctx.lineTo(shaderEnd[0], shaderEnd[1]);
   ctx.stroke();
+  const chipFont = Math.max(10, width * 0.0135);
+  drawCanvasChip(ctx, "L", lightEnd[0], lightEnd[1] - 14, {
+    fontSize: chipFont,
+    color: "rgba(255, 243, 201, 0.98)",
+  });
+  drawCanvasChip(ctx, "Ng", geometryEnd[0] + 14, geometryEnd[1] - 14, {
+    fontSize: chipFont,
+    color: "rgba(239, 245, 247, 0.98)",
+  });
+  drawCanvasChip(ctx, "Ns", shaderEnd[0] + 14, shaderEnd[1] + 14, {
+    fontSize: chipFont,
+    color: "rgba(110, 226, 201, 0.98)",
+  });
 
   const meterX = 20;
   const meterY = height - 34;
@@ -8945,18 +8971,6 @@ function drawNormalCodeLab(ctx, canvas, derived) {
   ctx.fillStyle = rgbToCss([0.22 + derived.diffuse * 0.66, 0.74, 0.92 - derived.diffuse * 0.2]);
   ctx.fillRect(meterX, meterY, meterW * derived.diffuse, meterH);
 
-  ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-  ctx.font = `${Math.max(12, width * 0.022)}px "Avenir Next", "Segoe UI", sans-serif`;
-  ctx.fillText("light", lightEnd[0] + 10, lightEnd[1] - 10);
-  ctx.fillText("geometry normal", geometryEnd[0] + 10, geometryEnd[1] - 10);
-  ctx.fillText("shader normal", shaderEnd[0] + 10, shaderEnd[1] + 18);
-  ctx.fillText(
-    derived.values.fix_normal_matrix
-      ? "The shader keeps the normal perpendicular to the transformed surface."
-      : "The shader is using the naive transformed normal instead of the corrected one.",
-    20,
-    24
-  );
 }
 
 function setupNormalCodeLab() {
@@ -10754,6 +10768,19 @@ function setupNormalProbeDemo() {
       ctx.moveTo(center[0], center[1]);
       ctx.lineTo(shaderEnd[0], shaderEnd[1]);
       ctx.stroke();
+      const chipFont = Math.max(10, width * 0.0135);
+      drawCanvasChip(ctx, "L", lightEnd[0], lightEnd[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(255, 243, 201, 0.98)",
+      });
+      drawCanvasChip(ctx, "Ng", geometryEnd[0] + 14, geometryEnd[1] - 14, {
+        fontSize: chipFont,
+        color: "rgba(239, 245, 247, 0.98)",
+      });
+      drawCanvasChip(ctx, "Ns", shaderEnd[0] + 14, shaderEnd[1] + 14, {
+        fontSize: chipFont,
+        color: "rgba(110, 226, 201, 0.98)",
+      });
 
       const meterX = 20;
       const meterY = height - 34;
@@ -10763,19 +10790,6 @@ function setupNormalProbeDemo() {
       ctx.fillRect(meterX, meterY, meterW, meterH);
       ctx.fillStyle = rgbToCss([0.22 + diffuse * 0.66, 0.74, 0.92 - diffuse * 0.2]);
       ctx.fillRect(meterX, meterY, meterW * diffuse, meterH);
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-      ctx.font = `${Math.max(12, width * 0.022)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText("light", lightEnd[0] + 10, lightEnd[1] - 10);
-      ctx.fillText("geometry normal", geometryEnd[0] + 10, geometryEnd[1] - 10);
-      ctx.fillText("shader normal", shaderEnd[0] + 10, shaderEnd[1] + 18);
-      if (scaled && !fixed) {
-        ctx.fillText("non-uniform scale is breaking the shader normal", 20, 24);
-      } else if (scaled && fixed) {
-        ctx.fillText("inverse-transpose style fix keeps the normal perpendicular", 20, 24);
-      } else {
-        ctx.fillText("without non-uniform scale, the geometric and shader normals match", 20, 24);
-      }
 
       if (readouts.geometry) {
         readouts.geometry.textContent = formatVector(geometricNormal, 2);

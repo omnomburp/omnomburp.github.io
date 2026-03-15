@@ -350,11 +350,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="texture-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="texture-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="texture-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -374,7 +374,8 @@ uv = vec2(0.62, 0.34)
 uv_scale = 6
 linear_filter = true</textarea>
                 </div>
-                <p id="texture-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="texture-code-instructions" hidden></p>
+                <p id="texture-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -385,6 +386,7 @@ linear_filter = true</textarea>
                 <p>The sampled point, highlighted texels, and output swatch stay linked so filtering reads like a concrete rule instead of an abstract setting.</p>
               </div>
               <canvas id="texture-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Texture sampling code lab output"></canvas>
+              <div class="code-lab-match" id="texture-code-match" hidden></div>
               <p class="code-lab-caption">Nearest chooses one texel. Linear filtering blends the neighborhood around the same wrapped UV.</p>
             </article>
           </div>

@@ -307,11 +307,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="compare-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="compare-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="compare-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -332,7 +332,8 @@ object_drift = 0.06
 cast_shadow = true
 cast_reflection = true</textarea>
                 </div>
-                <p id="compare-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="compare-code-instructions" hidden></p>
+                <p id="compare-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -343,6 +344,7 @@ cast_reflection = true</textarea>
                 <p>The image-plane view and the world-space ray view stay synchronized so you can compare what each method treats as its first-class question.</p>
               </div>
               <canvas id="compare-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Rasterization versus ray tracing code lab output"></canvas>
+              <div class="code-lab-match" id="compare-code-match" hidden></div>
               <p class="code-lab-caption">Rasterization resolves a screen winner. Ray tracing follows a primary ray, then optionally asks more visibility questions from the hit.</p>
             </article>
           </div>

@@ -1488,6 +1488,103 @@ input[type="checkbox"]:focus-visible {
   padding: 0 1.1rem 1.1rem;
 }
 
+.code-lab-tabs-container {
+  display: contents;
+}
+
+.code-lab-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.code-lab-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(19, 37, 53, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: rgba(19, 37, 53, 0.72);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.code-lab-tab:hover,
+.code-lab-tab:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(19, 37, 53, 0.18);
+  box-shadow: 0 10px 18px rgba(12, 26, 36, 0.08);
+}
+
+.code-lab-tab:focus-visible {
+  outline: 2px solid rgba(115, 221, 213, 0.32);
+  outline-offset: 2px;
+}
+
+.code-lab-tab.is-active {
+  background: linear-gradient(135deg, rgba(19, 110, 101, 0.96), rgba(233, 160, 62, 0.94));
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 14px 24px rgba(12, 26, 36, 0.14);
+}
+
+.code-lab-instructions {
+  margin: 0;
+  padding: 0.15rem 0.1rem;
+  color: var(--ink-faint);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.code-lab-instructions[hidden] {
+  display: none;
+}
+
+.code-lab-match {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-lg);
+  background: rgba(247, 160, 74, 0.12);
+  color: rgba(19, 37, 53, 0.82);
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: background 260ms ease, color 260ms ease;
+}
+
+.code-lab-match[hidden] {
+  display: none;
+}
+
+.code-lab-match.is-matched {
+  background: rgba(52, 186, 148, 0.16);
+  color: rgba(14, 94, 74, 0.92);
+}
+
+.code-lab-match-icon {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: rgba(233, 160, 62, 0.88);
+  transition: background 260ms ease;
+}
+
+.code-lab-match-icon.is-matched {
+  background: rgba(52, 186, 148, 0.92);
+}
+
 .editor-toolbar {
   display: flex;
   align-items: center;

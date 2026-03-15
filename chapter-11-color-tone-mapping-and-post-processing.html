@@ -294,11 +294,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="color-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="color-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="color-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -319,7 +319,8 @@ scene_peak = 3.8
 tone_map = true
 gamma = 2.2</textarea>
                 </div>
-                <p id="color-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="color-code-instructions" hidden></p>
+                <p id="color-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -330,6 +331,7 @@ gamma = 2.2</textarea>
                 <p>The three panels stay linked so you can read exposure, tone mapping, and display encoding as separate responsibilities instead of one blurred finishing step.</p>
               </div>
               <canvas id="color-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Color pipeline code lab output"></canvas>
+              <div class="code-lab-match" id="color-code-match" hidden></div>
               <p class="code-lab-caption">Linear values can exceed the display range. Tone mapping and display encoding prepare that signal for the monitor in different ways.</p>
             </article>
           </div>

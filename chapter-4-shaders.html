@@ -742,11 +742,11 @@ indices   = [0, 1, 2,  2, 1, 3]
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="shader-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="shader-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="shader-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -767,7 +767,8 @@ wave_density = 12
 color_shift = 0.44
 time = 0.60</textarea>
                 </div>
-                <p id="shader-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="shader-code-instructions" hidden></p>
+                <p id="shader-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -778,6 +779,7 @@ time = 0.60</textarea>
                 <p>The deformed grid is the vertex-stage story. The cell coloring is the fragment-stage story layered on top of it.</p>
               </div>
               <canvas id="shader-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Shader stage code lab output"></canvas>
+              <div class="code-lab-match" id="shader-code-match" hidden></div>
               <p class="code-lab-caption">One bound wave rule moves the mesh. A different bound color rule paints the final fragments.</p>
             </article>
           </div>

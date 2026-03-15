@@ -434,11 +434,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="normal-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="normal-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="normal-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -459,7 +459,8 @@ light_angle = 42
 scale = vec2(1.80, 0.52)
 fix_normal_matrix = true</textarea>
                 </div>
-                <p id="normal-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="normal-code-instructions" hidden></p>
+                <p id="normal-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -470,6 +471,7 @@ fix_normal_matrix = true</textarea>
                 <p>The patch, light vector, and diffuse meter now respond to explicit lesson bindings instead of only slider motion.</p>
               </div>
               <canvas id="normal-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normal matrix code lab output"></canvas>
+              <div class="code-lab-match" id="normal-code-match" hidden></div>
               <p class="code-lab-caption">The white line stays perpendicular to the transformed surface. The cyan line shows what the shader is actually using.</p>
             </article>
           </div>

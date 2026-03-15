@@ -326,11 +326,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="shadow-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="shadow-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="shadow-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -351,7 +351,8 @@ receiver_depth = 0.47
 bias = 0.02
 soft_filter = true</textarea>
                 </div>
-                <p id="shadow-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="shadow-code-instructions" hidden></p>
+                <p id="shadow-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -362,6 +363,7 @@ soft_filter = true</textarea>
                 <p>The bars, adjusted depth line, and lighting swatch stay linked so you can see exactly when a receiver flips from lit to shadowed.</p>
               </div>
               <canvas id="shadow-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Shadow compare code lab output"></canvas>
+              <div class="code-lab-match" id="shadow-code-match" hidden></div>
               <p class="code-lab-caption">Bias changes the receiver depth before the compare. Soft filtering averages several nearby shadow tests.</p>
             </article>
           </div>

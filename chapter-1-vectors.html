@@ -936,11 +936,11 @@ col2 = (b, d)
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="vectors-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="vectors-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="vectors-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -962,7 +962,8 @@ point = vec2(1.10, 0.55)
 translate = vec2(0.80, -0.40)
 point_w = 1</textarea>
                 </div>
-                <p id="vectors-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="vectors-code-instructions" hidden></p>
+                <p id="vectors-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -973,6 +974,7 @@ point_w = 1</textarea>
                 <p>The stage updates from the lesson bindings instead of sliders, so each edit feels closer to a real draw setup.</p>
               </div>
               <canvas id="vectors-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Vectors code lab output"></canvas>
+              <div class="code-lab-match" id="vectors-code-match" hidden></div>
               <p class="code-lab-caption">The editor changes the same idea you saw earlier, but now the geometry is being driven by explicit bound values instead of sliders.</p>
             </article>
           </div>

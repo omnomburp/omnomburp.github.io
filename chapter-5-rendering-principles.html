@@ -520,11 +520,11 @@ pass 4: composite     → screen
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="rendering-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="rendering-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="rendering-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -546,7 +546,8 @@ front_color = vec3(0.22, 0.74, 0.94)
 back_color = vec3(0.96, 0.62, 0.34)
 depth_test = true</textarea>
                 </div>
-                <p id="rendering-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="rendering-code-instructions" hidden></p>
+                <p id="rendering-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -557,6 +558,7 @@ depth_test = true</textarea>
                 <p>The canvas slows the render down to the exact compare that the depth buffer performs for opaque visibility.</p>
               </div>
               <canvas id="rendering-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Rendering depth compare code lab output"></canvas>
+              <div class="code-lab-match" id="rendering-code-match" hidden></div>
               <p class="code-lab-caption">With depth testing on, the smaller depth wins. With it off, the later draw call overwrites the earlier one.</p>
             </article>
           </div>

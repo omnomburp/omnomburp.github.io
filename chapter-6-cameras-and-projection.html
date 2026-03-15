@@ -401,11 +401,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="projection-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="projection-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="projection-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -426,7 +426,8 @@ fov = 56
 camera_distance = 4.40
 ortho_height = 1.90</textarea>
                 </div>
-                <p id="projection-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="projection-code-instructions" hidden></p>
+                <p id="projection-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -437,6 +438,7 @@ ortho_height = 1.90</textarea>
                 <p>The diagram and screen bars stay linked so you can read size change as a camera/projection effect rather than a scene change.</p>
               </div>
               <canvas id="projection-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Projection code lab output"></canvas>
+              <div class="code-lab-match" id="projection-code-match" hidden></div>
               <p class="code-lab-caption">Perspective shrinks the farther object. Orthographic keeps the near and far heights matched.</p>
             </article>
           </div>

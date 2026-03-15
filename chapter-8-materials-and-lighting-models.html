@@ -291,11 +291,11 @@
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="material-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="material-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="material-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -317,7 +317,8 @@ view_angle = 12
 specular_strength = 0.48
 shininess = 36</textarea>
                 </div>
-                <p id="material-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="material-code-instructions" hidden></p>
+                <p id="material-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -328,6 +329,7 @@ shininess = 36</textarea>
                 <p>The arrows, response bars, and final swatch stay synchronized so you can read a highlight as a geometric condition, not an arbitrary paint effect.</p>
               </div>
               <canvas id="material-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Material response code lab output"></canvas>
+              <div class="code-lab-match" id="material-code-match" hidden></div>
               <p class="code-lab-caption">Diffuse follows normal-light alignment. Specular grows when the eye lines up with the favored glossy direction.</p>
             </article>
           </div>

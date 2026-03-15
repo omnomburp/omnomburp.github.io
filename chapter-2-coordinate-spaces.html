@@ -769,11 +769,11 @@ p_clip   -> /w -> p_ndc</code></pre>
 
           <div class="code-lab-layout">
             <div class="code-lab-column">
+              <div class="code-lab-tabs-container" id="spaces-code-tabs"></div>
               <div class="code-lab-shell">
                 <div class="editor-toolbar">
                   <p class="sidebar-label">Lesson code</p>
                   <div class="editor-actions">
-                    <button class="editor-button" id="spaces-code-run" type="button">Run code</button>
                     <button class="editor-button editor-button-ghost" id="spaces-code-reset" type="button">Reset</button>
                   </div>
                 </div>
@@ -794,7 +794,8 @@ model_translate = vec3(1.20, -0.18, -0.70)
 model_rotate_y = 32
 fov = 52</textarea>
                 </div>
-                <p id="spaces-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+                <p class="code-lab-instructions" id="spaces-code-instructions" hidden></p>
+                <p id="spaces-code-status" class="code-status">Ready.</p>
               </div>
             </div>
 
@@ -805,6 +806,7 @@ fov = 52</textarea>
                 <p>The same bound input is redrawn through object, world, view, clip, and NDC so the code reads like a visible pipeline.</p>
               </div>
               <canvas id="spaces-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Coordinate spaces code lab output"></canvas>
+              <div class="code-lab-match" id="spaces-code-match" hidden></div>
               <p class="code-lab-caption">Each stage box is showing the same vertex after a different part of the pipeline has reinterpreted it.</p>
             </article>
           </div>

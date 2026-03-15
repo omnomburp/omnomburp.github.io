@@ -276,55 +276,284 @@ function stripLessonComment(line) {
   return commentIndex === -1 ? line : line.slice(0, commentIndex);
 }
 
-function parseLessonScalar(text, lineNumber) {
-  const trimmed = text.trim();
-  const value = Number(trimmed);
-  if (trimmed === "" || !Number.isFinite(value)) {
-    throw new Error(`Line ${lineNumber}: expected a number.`);
+
+const EXPR_FUNCTIONS = [
+  ["sin", 1, Math.sin],
+  ["cos", 1, Math.cos],
+  ["tan", 1, Math.tan],
+  ["sqrt", 1, Math.sqrt],
+  ["abs", 1, Math.abs],
+  ["floor", 1, Math.floor],
+  ["ceil", 1, Math.ceil],
+  ["min", 2, Math.min],
+  ["max", 2, Math.max],
+  ["pow", 2, Math.pow],
+  ["clamp", 3, function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }],
+];
+
+const EXPR_BUILTIN_NAMES = new Set([
+  "vec2", "vec3", "vec4",
+  "sin", "cos", "tan", "sqrt", "abs", "floor", "ceil",
+  "min", "max", "pow", "clamp", "PI",
+]);
+
+function findExprFunction(name) {
+  for (let i = 0; i < EXPR_FUNCTIONS.length; i += 1) {
+    if (EXPR_FUNCTIONS[i][0] === name) return EXPR_FUNCTIONS[i];
+  }
+  return null;
+}
+
+function createExpressionParser() {
+  const tokens = [];
+  for (let i = 0; i < 64; i += 1) {
+    tokens.push({ type: 0, value: 0, start: 0 });
+  }
+  return { tokens, count: 0, pos: 0, values: null };
+}
+
+function tokenizeLessonExpression(source, tokens) {
+  let count = 0;
+  let i = 0;
+  const len = source.length;
+
+  while (i < len) {
+    const ch = source.charCodeAt(i);
+    if (ch === 32 || ch === 9) { i += 1; continue; }
+    if (count >= tokens.length) {
+      tokens.push({ type: 0, value: 0, start: 0 });
+    }
+    const tok = tokens[count];
+    tok.start = i;
+
+    if (
+      (ch >= 48 && ch <= 57) ||
+      (ch === 46 && i + 1 < len && source.charCodeAt(i + 1) >= 48 && source.charCodeAt(i + 1) <= 57)
+    ) {
+      let j = i;
+      while (j < len && source.charCodeAt(j) >= 48 && source.charCodeAt(j) <= 57) j += 1;
+      if (j < len && source.charCodeAt(j) === 46) {
+        j += 1;
+        while (j < len && source.charCodeAt(j) >= 48 && source.charCodeAt(j) <= 57) j += 1;
+      }
+      tok.type = 0;
+      tok.value = Number(source.slice(i, j));
+      i = j;
+      count += 1;
+      continue;
+    }
+
+    if ((ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) || ch === 95) {
+      let j = i + 1;
+      while (j < len) {
+        const c = source.charCodeAt(j);
+        if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c === 95) j += 1;
+        else break;
+      }
+      const word = source.slice(i, j);
+      if (word === "true" || word === "false") {
+        tok.type = 8;
+        tok.value = word === "true";
+      } else {
+        tok.type = 1;
+        tok.value = word;
+      }
+      i = j;
+      count += 1;
+      continue;
+    }
+
+    if (ch === 43 || ch === 45 || ch === 42 || ch === 47) {
+      tok.type = 2;
+      tok.value = source[i];
+      i += 1;
+      count += 1;
+      continue;
+    }
+    if (ch === 40) { tok.type = 3; tok.value = "("; i += 1; count += 1; continue; }
+    if (ch === 41) { tok.type = 4; tok.value = ")"; i += 1; count += 1; continue; }
+    if (ch === 44) { tok.type = 5; tok.value = ","; i += 1; count += 1; continue; }
+    if (ch === 46) { tok.type = 6; tok.value = "."; i += 1; count += 1; continue; }
+
+    throw new Error(`unexpected character '${source[i]}'`);
+  }
+
+  return count;
+}
+
+function exprPeek(parser) {
+  return parser.pos < parser.count ? parser.tokens[parser.pos] : null;
+}
+
+function exprConsume(parser) {
+  return parser.tokens[parser.pos++];
+}
+
+function exprExpect(parser, type, label) {
+  const tok = exprPeek(parser);
+  if (!tok || tok.type !== type) throw new Error(label || "unexpected token");
+  return exprConsume(parser);
+}
+
+function evalExprArgList(parser) {
+  const args = [];
+  if (exprPeek(parser) && exprPeek(parser).type === 4) {
+    exprConsume(parser);
+    return args;
+  }
+  args.push(evalExprAdditive(parser));
+  while (exprPeek(parser) && exprPeek(parser).type === 5) {
+    exprConsume(parser);
+    args.push(evalExprAdditive(parser));
+  }
+  exprExpect(parser, 4, "expected ')'");
+  return args;
+}
+
+function evalExprPrimary(parser) {
+  const tok = exprPeek(parser);
+  if (!tok) throw new Error("unexpected end of expression");
+
+  if (tok.type === 0) { exprConsume(parser); return tok.value; }
+  if (tok.type === 8) { exprConsume(parser); return tok.value; }
+
+  if (tok.type === 3) {
+    exprConsume(parser);
+    const val = evalExprAdditive(parser);
+    exprExpect(parser, 4, "expected ')'");
+    return val;
+  }
+
+  if (tok.type === 1) {
+    const name = tok.value;
+    exprConsume(parser);
+    if (name === "PI") return Math.PI;
+
+    const next = exprPeek(parser);
+    if (next && next.type === 3) {
+      exprConsume(parser);
+      if (name === "vec2" || name === "vec3" || name === "vec4") {
+        const size = Number(name[3]);
+        const args = evalExprArgList(parser);
+        if (args.length !== size) throw new Error(`${name} needs ${size} values`);
+        for (let a = 0; a < args.length; a += 1) {
+          if (typeof args[a] !== "number") throw new Error(`${name} values must be numbers`);
+        }
+        return args;
+      }
+      const fn = findExprFunction(name);
+      if (!fn) throw new Error(`unknown function "${name}"`);
+      const args = evalExprArgList(parser);
+      if (args.length !== fn[1]) throw new Error(`${name} takes ${fn[1]} argument${fn[1] === 1 ? "" : "s"}`);
+      for (let a = 0; a < args.length; a += 1) {
+        if (typeof args[a] !== "number") throw new Error(`${name} arguments must be numbers`);
+      }
+      if (fn[1] === 1) return fn[2](args[0]);
+      if (fn[1] === 2) return fn[2](args[0], args[1]);
+      return fn[2](args[0], args[1], args[2]);
+    }
+
+    if (parser.values && name in parser.values) {
+      const val = parser.values[name];
+      return Array.isArray(val) ? val.slice() : val;
+    }
+    throw new Error(`unknown identifier "${name}"`);
+  }
+
+  throw new Error("unexpected token");
+}
+
+function evalExprPostfix(parser) {
+  let value = evalExprPrimary(parser);
+  while (exprPeek(parser) && exprPeek(parser).type === 6) {
+    exprConsume(parser);
+    const comp = exprExpect(parser, 1, "expected component name");
+    if (!Array.isArray(value)) throw new Error("component access on non-vector");
+    const idx = lessonComponentIndex(comp.value, value.length);
+    if (idx === -1) throw new Error(`no component .${comp.value}`);
+    value = value[idx];
   }
   return value;
 }
 
-function parseLessonBoolean(text, lineNumber) {
-  const trimmed = text.trim().toLowerCase();
-  if (trimmed === "true") {
-    return true;
+function evalExprUnary(parser) {
+  const tok = exprPeek(parser);
+  if (tok && tok.type === 2 && tok.value === "-") {
+    exprConsume(parser);
+    const val = evalExprUnary(parser);
+    if (typeof val === "number") return -val;
+    if (Array.isArray(val)) {
+      const r = [];
+      for (let i = 0; i < val.length; i += 1) r.push(-val[i]);
+      return r;
+    }
+    throw new Error("cannot negate this type");
   }
-  if (trimmed === "false") {
-    return false;
-  }
-  throw new Error(`Line ${lineNumber}: expected true or false.`);
+  return evalExprPostfix(parser);
 }
 
-function parseLessonVector(text, size, lineNumber) {
-  const match = text.trim().match(/^vec([234])\s*\((.*)\)$/);
-  if (!match || Number(match[1]) !== size) {
-    throw new Error(`Line ${lineNumber}: expected vec${size}(...).`);
+function evalExprMultiplicative(parser) {
+  let left = evalExprUnary(parser);
+  while (true) {
+    const tok = exprPeek(parser);
+    if (!tok || tok.type !== 2 || (tok.value !== "*" && tok.value !== "/")) break;
+    const op = tok.value;
+    exprConsume(parser);
+    const right = evalExprUnary(parser);
+    if (typeof left === "number" && typeof right === "number") {
+      left = op === "*" ? left * right : left / right;
+    } else if (Array.isArray(left) && typeof right === "number") {
+      const r = [];
+      for (let i = 0; i < left.length; i += 1) r.push(op === "*" ? left[i] * right : left[i] / right);
+      left = r;
+    } else if (typeof left === "number" && Array.isArray(right)) {
+      if (op === "/") throw new Error("cannot divide scalar by vector");
+      const r = [];
+      for (let i = 0; i < right.length; i += 1) r.push(left * right[i]);
+      left = r;
+    } else {
+      throw new Error("type mismatch in arithmetic");
+    }
   }
-
-  const parts = match[2].split(",").map((part) => part.trim());
-  if (parts.length !== size || parts.some((part) => part === "")) {
-    throw new Error(`Line ${lineNumber}: vec${size} needs ${size} numeric values.`);
-  }
-
-  return parts.map((part) => parseLessonScalar(part, lineNumber));
+  return left;
 }
 
-function parseLessonBindings(source, schema, defaults) {
-  const values = cloneLessonDefaults(schema, defaults);
+function evalExprAdditive(parser) {
+  let left = evalExprMultiplicative(parser);
+  while (true) {
+    const tok = exprPeek(parser);
+    if (!tok || tok.type !== 2 || (tok.value !== "+" && tok.value !== "-")) break;
+    const op = tok.value;
+    exprConsume(parser);
+    const right = evalExprMultiplicative(parser);
+    if (typeof left === "number" && typeof right === "number") {
+      left = op === "+" ? left + right : left - right;
+    } else if (Array.isArray(left) && Array.isArray(right) && left.length === right.length) {
+      const r = [];
+      for (let i = 0; i < left.length; i += 1) r.push(op === "+" ? left[i] + right[i] : left[i] - right[i]);
+      left = r;
+    } else {
+      throw new Error("type mismatch in arithmetic");
+    }
+  }
+  return left;
+}
+
+function parseLessonExpressions(source, schema, defaults, lastGood, parser) {
+  const values = lastGood ? cloneLessonDefaults(schema, lastGood) : cloneLessonDefaults(schema, defaults);
   const lines = source.split(/\r?\n/);
   let appliedCount = 0;
+  const errors = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const stripped = stripLessonComment(lines[index]).trim();
-    if (!stripped) {
-      continue;
-    }
+    if (!stripped) continue;
 
     const match = stripped.match(/^([A-Za-z_][A-Za-z0-9_]*(?:\.[xyzw])?)\s*=\s*(.+)$/);
     if (!match) {
-      throw new Error(`Line ${lineNumber}: expected name = value.`);
+      errors.push(`Line ${lineNumber}: expected name = expression.`);
+      continue;
     }
 
     const lhs = match[1];
@@ -335,42 +564,42 @@ function parseLessonBindings(source, schema, defaults) {
     const entry = findLessonSchemaEntry(schema, name);
 
     if (!entry) {
-      throw new Error(`Line ${lineNumber}: unknown binding "${name}".`);
+      errors.push(`Line ${lineNumber}: unknown binding "${name}".`);
+      continue;
     }
 
-    if (component) {
-      const size = lessonVectorSize(entry.type);
-      const componentIndex = lessonComponentIndex(component, size);
-      if (componentIndex === -1) {
-        throw new Error(`Line ${lineNumber}: "${name}" has no ".${component}" component.`);
+    try {
+      parser.count = tokenizeLessonExpression(rhs, parser.tokens);
+      parser.pos = 0;
+      parser.values = values;
+      const result = evalExprAdditive(parser);
+
+      if (parser.pos < parser.count) throw new Error("unexpected tokens after expression");
+
+      if (component) {
+        const size = lessonVectorSize(entry.type);
+        const compIdx = lessonComponentIndex(component, size);
+        if (compIdx === -1) throw new Error(`"${name}" has no ".${component}" component`);
+        if (typeof result !== "number") throw new Error("component assignment requires a number");
+        values[name][compIdx] = result;
+      } else if (entry.type === "number") {
+        if (typeof result !== "number") throw new Error("expected a number");
+        values[name] = result;
+      } else if (entry.type === "bool") {
+        if (typeof result !== "boolean") throw new Error("expected true or false");
+        values[name] = result;
+      } else {
+        const size = lessonVectorSize(entry.type);
+        if (!Array.isArray(result) || result.length !== size) throw new Error(`expected ${entry.type}(...)`);
+        values[name] = result;
       }
-      values[name][componentIndex] = parseLessonScalar(rhs, lineNumber);
       appliedCount += 1;
-      continue;
+    } catch (err) {
+      errors.push(`Line ${lineNumber}: ${err.message}`);
     }
-
-    if (entry.type === "number") {
-      values[name] = parseLessonScalar(rhs, lineNumber);
-      appliedCount += 1;
-      continue;
-    }
-
-    if (entry.type === "bool") {
-      values[name] = parseLessonBoolean(rhs, lineNumber);
-      appliedCount += 1;
-      continue;
-    }
-
-    const size = lessonVectorSize(entry.type);
-    if (!size) {
-      throw new Error(`Line ${lineNumber}: unsupported binding type "${entry.type}".`);
-    }
-
-    values[name] = parseLessonVector(rhs, size, lineNumber);
-    appliedCount += 1;
   }
 
-  return { values, appliedCount };
+  return { values, appliedCount, errors };
 }
 
 function setCodeStatus(element, message, isError = false) {
@@ -417,8 +646,8 @@ function highlightLessonBindingTarget(target) {
   ].join("");
 }
 
-function highlightLessonCodeFragment(text) {
-  const pattern = /vec[234]|true|false|-?(?:\d+\.\d+|\d+|\.\d+)|[=(),.]/g;
+function highlightLessonCodeFragment(text, schemaNames) {
+  const pattern = /[A-Za-z_][A-Za-z0-9_]*|(?:\d+\.\d+|\d+|\.\d+)|[=(),.+\-*/]/g;
   let result = "";
   let cursor = 0;
   let match = pattern.exec(text);
@@ -426,17 +655,25 @@ function highlightLessonCodeFragment(text) {
   while (match) {
     result += escapeHtml(text.slice(cursor, match.index));
     const token = match[0];
-    let className = "token-punctuation";
-    if (token === "vec2" || token === "vec3" || token === "vec4") {
-      className = "token-builtin";
+    let className = "";
+    if (/^(?:\d+\.\d+|\d+|\.\d+)$/.test(token)) {
+      className = "token-number";
     } else if (token === "true" || token === "false") {
       className = "token-keyword";
-    } else if (/^-?(?:\d+\.\d+|\d+|\.\d+)$/.test(token)) {
-      className = "token-number";
-    } else if (token === "=") {
+    } else if (EXPR_BUILTIN_NAMES.has(token)) {
+      className = "token-builtin";
+    } else if (schemaNames && schemaNames.has(token)) {
+      className = "token-binding";
+    } else if (/^[=+\-*/]$/.test(token)) {
       className = "token-operator";
+    } else if (/^[(),.]$/.test(token)) {
+      className = "token-punctuation";
     }
-    result += `<span class="${className}">${escapeHtml(token)}</span>`;
+    if (className) {
+      result += `<span class="${className}">${escapeHtml(token)}</span>`;
+    } else {
+      result += escapeHtml(token);
+    }
     cursor = pattern.lastIndex;
     match = pattern.exec(text);
   }
@@ -445,7 +682,7 @@ function highlightLessonCodeFragment(text) {
   return result;
 }
 
-function highlightLessonBindings(source) {
+function highlightLessonBindings(source, schemaNames) {
   const lines = source.split(/\r?\n/);
   const highlighted = [];
 
@@ -463,9 +700,9 @@ function highlightLessonBindings(source) {
         `${escapeHtml(assignmentMatch[3])}` +
         `<span class="token-operator">=</span>` +
         `${escapeHtml(assignmentMatch[4])}` +
-        `${highlightLessonCodeFragment(assignmentMatch[5])}`;
+        `${highlightLessonCodeFragment(assignmentMatch[5], schemaNames)}`;
     } else {
-      html = highlightLessonCodeFragment(body);
+      html = highlightLessonCodeFragment(body, schemaNames);
     }
 
     if (comment) {
@@ -478,7 +715,7 @@ function highlightLessonBindings(source) {
   return highlighted.join("\n");
 }
 
-function setupLessonCodeEditor(input, highlight) {
+function setupLessonCodeEditor(input, highlight, schemaNames) {
   const noopEditor = { refresh() {} };
   if (!input || !highlight) {
     return noopEditor;
@@ -490,7 +727,7 @@ function setupLessonCodeEditor(input, highlight) {
   }
 
   function refresh() {
-    highlight.innerHTML = highlightLessonBindings(input.value || "");
+    highlight.innerHTML = highlightLessonBindings(input.value || "", schemaNames);
     syncScroll();
   }
 
@@ -1102,75 +1339,151 @@ function drawTextLines(ctx, lines, x, y, lineHeight, maxWidth = Infinity) {
   return cursorY - y;
 }
 
-function setupStructuredCodeLab(config) {
+function setupCodeLab(config) {
   const canvas = document.getElementById(config.canvasId || `${config.prefix}-canvas`);
   const ctx = get2dContext(canvas);
   const input = document.getElementById(config.inputId || `${config.prefix}-input`);
   const highlight = document.getElementById(config.highlightId || `${config.prefix}-highlight`);
-  const runButton = document.getElementById(config.runId || `${config.prefix}-run`);
   const resetButton = document.getElementById(config.resetId || `${config.prefix}-reset`);
   const status = document.getElementById(config.statusId || `${config.prefix}-status`);
   const stepList = document.getElementById(config.stepListId || `${config.prefix}-steps`);
   const loweredOutput = document.getElementById(config.loweredId || `${config.prefix}-lowered`);
-  if (!ctx || !input || !runButton || !resetButton) {
-    return;
-  }
+  const tabsContainer = document.getElementById(`${config.prefix}-tabs`);
+  const instructionsEl = document.getElementById(`${config.prefix}-instructions`);
+  const matchEl = document.getElementById(`${config.prefix}-match`);
+  if (!ctx || !input || !resetButton) return;
 
   const readouts = {};
   for (const [key, elementId] of Object.entries(config.readoutIds || {})) {
     readouts[key] = document.getElementById(elementId);
   }
 
-  const defaultSource = input.value;
-  const state = {
-    appliedSource: defaultSource,
-    derived: null,
-  };
-  const pendingMessage = config.pendingMessage || "Edits pending. Press Run or use Cmd/Ctrl+Enter to apply changes.";
-  const editor = setupLessonCodeEditor(input, highlight);
+  const schemaNames = new Set();
+  for (const entry of config.schema) schemaNames.add(entry.name);
 
-  function applySource(source) {
-    try {
-      const parsed = parseLessonBindings(source, config.schema, config.defaults);
-      const derived = config.evaluate(parsed.values);
-      state.appliedSource = source;
-      state.derived = derived;
-      if (config.updateUi) {
-        config.updateUi(derived, readouts, stepList, loweredOutput);
-      }
+  const levels = config.levels || null;
+  const hasLevels = levels && levels.length > 0;
+  const parser = createExpressionParser();
+  const levelSources = {};
+  let currentLevelIndex = 0;
+
+  const state = {
+    lastGood: null,
+    derived: null,
+    pendingFrame: 0,
+  };
+
+  function getDefaultSource() {
+    if (hasLevels) return levels[currentLevelIndex].source || "";
+    return config.defaultSource || input.value;
+  }
+
+  const editor = setupLessonCodeEditor(input, highlight, schemaNames);
+
+  if (hasLevels) {
+    for (let i = 0; i < levels.length; i += 1) {
+      levelSources[levels[i].id] = levels[i].source || "";
+    }
+    input.value = levels[0].source || "";
+    editor.refresh();
+  }
+
+  if (hasLevels && tabsContainer) {
+    const tabBar = document.createElement("div");
+    tabBar.className = "code-lab-tabs";
+    for (let i = 0; i < levels.length; i += 1) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "code-lab-tab";
+      btn.textContent = levels[i].label;
+      btn.dataset.levelIndex = i;
+      if (i === 0) btn.classList.add("is-active");
+      btn.addEventListener("click", function () { switchLevel(Number(this.dataset.levelIndex)); });
+      tabBar.appendChild(btn);
+    }
+    tabsContainer.appendChild(tabBar);
+  }
+
+  function switchLevel(index) {
+    if (hasLevels) levelSources[levels[currentLevelIndex].id] = input.value;
+    currentLevelIndex = index;
+    input.value = levelSources[levels[index].id];
+    editor.refresh();
+    if (tabsContainer) {
+      const tabs = tabsContainer.querySelectorAll(".code-lab-tab");
+      for (let i = 0; i < tabs.length; i += 1) tabs[i].classList.toggle("is-active", i === index);
+    }
+    if (instructionsEl) {
+      instructionsEl.textContent = levels[index].instructions || "";
+      instructionsEl.hidden = !levels[index].instructions;
+    }
+    state.lastGood = null;
+    evaluate();
+  }
+
+  function evaluate() {
+    const parsed = parseLessonExpressions(input.value, config.schema, config.defaults, state.lastGood, parser);
+    const derived = config.evaluate(parsed.values);
+    state.derived = derived;
+    if (parsed.errors.length === 0) state.lastGood = parsed.values;
+
+    if (config.updateUi) config.updateUi(derived, readouts, stepList, loweredOutput);
+
+    if (parsed.errors.length > 0) {
+      setCodeStatus(status, parsed.errors[0], true);
+    } else {
       setCodeStatus(
         status,
         config.getStatusMessage
           ? config.getStatusMessage(parsed, derived)
           : `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}.`
       );
-      markAllDemosDirty();
-    } catch (error) {
-      setCodeStatus(status, error instanceof Error ? error.message : "Could not parse the lesson bindings.", true);
     }
+
+    updateMatch(derived);
+    markAllDemosDirty();
   }
 
-  runButton.addEventListener("click", () => {
-    applySource(input.value);
-  });
-  resetButton.addEventListener("click", () => {
-    input.value = defaultSource;
+  function updateMatch(derived) {
+    if (!matchEl || !hasLevels) return;
+    const level = levels[currentLevelIndex];
+    if (!level.target) {
+      matchEl.hidden = true;
+      return;
+    }
+    matchEl.hidden = false;
+    const matched = level.target.match(derived);
+    matchEl.classList.toggle("is-matched", matched);
+    matchEl.innerHTML = matched
+      ? '<span class="code-lab-match-icon is-matched"></span> Target reached!'
+      : '<span class="code-lab-match-icon"></span> Keep adjusting\u2026';
+  }
+
+  function scheduleEvaluate() {
+    if (state.pendingFrame) return;
+    state.pendingFrame = requestAnimationFrame(function () {
+      state.pendingFrame = 0;
+      evaluate();
+    });
+  }
+
+  input.addEventListener("input", scheduleEvaluate);
+
+  resetButton.addEventListener("click", function () {
+    const src = getDefaultSource();
+    if (hasLevels) levelSources[levels[currentLevelIndex].id] = src;
+    input.value = src;
     editor.refresh();
-    applySource(defaultSource);
-  });
-  input.addEventListener("input", () => {
-    if (input.value !== state.appliedSource) {
-      setCodeStatus(status, pendingMessage);
-    }
-  });
-  input.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      applySource(input.value);
-    }
+    state.lastGood = null;
+    evaluate();
   });
 
-  applySource(defaultSource);
+  if (hasLevels && instructionsEl && levels[0].instructions) {
+    instructionsEl.textContent = levels[0].instructions;
+    instructionsEl.hidden = false;
+  }
+
+  evaluate();
 
   registerDemo({
     canvas,
@@ -1178,10 +1491,12 @@ function setupStructuredCodeLab(config) {
     needsRender: true,
     render() {
       resizeCanvasToDisplaySize(canvas);
-      if (!state.derived) {
-        return;
+      if (!state.derived) return;
+      let targetDerived = null;
+      if (hasLevels && levels[currentLevelIndex].target && levels[currentLevelIndex].target.defaults) {
+        targetDerived = config.evaluate(levels[currentLevelIndex].target.defaults);
       }
-      config.draw(ctx, canvas, state.derived);
+      config.draw(ctx, canvas, state.derived, targetDerived);
     },
   });
 }
@@ -10985,239 +11300,196 @@ function updateVectorsCodeLabUi(derived, readouts, stepList, loweredOutput) {
   }
 }
 
-function setupVectorsCodeLab() {
-  const canvas = document.getElementById("vectors-code-canvas");
-  const ctx = get2dContext(canvas);
-  const input = document.getElementById("vectors-code-input");
-  const highlight = document.getElementById("vectors-code-highlight");
-  const runButton = document.getElementById("vectors-code-run");
-  const resetButton = document.getElementById("vectors-code-reset");
-  const status = document.getElementById("vectors-code-status");
-  const stepList = document.getElementById("vectors-code-steps");
-  const loweredOutput = document.getElementById("vectors-code-lowered");
-  if (!ctx || !input || !runButton || !resetButton) {
-    return;
+function drawVectorsCodeLab(ctx, canvas, derived) {
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const extent = Math.min(
+    6.2,
+    Math.max(
+      3.2,
+      Math.abs(derived.weightedI[0]) + 0.9,
+      Math.abs(derived.weightedI[1]) + 0.9,
+      Math.abs(derived.local[0]) + 1.1,
+      Math.abs(derived.local[1]) + 1.1,
+      Math.abs(derived.world[0]) + 1.1,
+      Math.abs(derived.world[1]) + 1.1,
+      Math.abs(derived.values.translate[0]) + 0.9,
+      Math.abs(derived.values.translate[1]) + 0.9
+    )
+  );
+  const gridLimit = Math.max(3, Math.min(6, Math.ceil(extent)));
+
+  function toCanvas(point) {
+    return [
+      width * 0.5 + (point[0] / extent) * (width * 0.5 - 26),
+      height * 0.5 - (point[1] / extent) * (height * 0.5 - 26),
+    ];
   }
 
-  const readouts = {
-    basis: document.getElementById("vectors-code-readout-basis"),
-    local: document.getElementById("vectors-code-readout-local"),
-    h: document.getElementById("vectors-code-readout-h"),
-    world: document.getElementById("vectors-code-readout-world"),
-  };
-  const defaultSource = input.value;
-  const schema = [
-    { name: "basis_angle", type: "number" },
-    { name: "basis_scale", type: "vec2" },
-    { name: "point", type: "vec2" },
-    { name: "translate", type: "vec2" },
-    { name: "point_w", type: "number" },
-  ];
-  const defaults = {
-    basis_angle: 28,
-    basis_scale: vec2(1.2, 0.92),
-    point: vec2(1.1, 0.55),
-    translate: vec2(0.8, -0.4),
-    point_w: 1,
-  };
-  const state = {
-    appliedSource: defaultSource,
-    derived: null,
-  };
-  const pendingMessage = "Edits pending. Press Run or use Cmd/Ctrl+Enter to apply changes.";
-  const editor = setupLessonCodeEditor(input, highlight);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
 
-  function applySource(source) {
-    try {
-      const parsed = parseLessonBindings(source, schema, defaults);
-      const derived = evaluateVectorsCodeLabBindings(parsed.values);
-      state.appliedSource = source;
-      state.derived = derived;
-      updateVectorsCodeLabUi(derived, readouts, stepList, loweredOutput);
+  const background = ctx.createLinearGradient(0, 0, 0, height);
+  background.addColorStop(0, "#102535");
+  background.addColorStop(1, "#183446");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+  ctx.lineWidth = 1;
+  for (let index = -gridLimit; index <= gridLimit; index += 1) {
+    const horizontalStart = toCanvas([-extent, index]);
+    const horizontalEnd = toCanvas([extent, index]);
+    ctx.beginPath();
+    ctx.moveTo(horizontalStart[0], horizontalStart[1]);
+    ctx.lineTo(horizontalEnd[0], horizontalEnd[1]);
+    ctx.stroke();
+
+    const verticalStart = toCanvas([index, -extent]);
+    const verticalEnd = toCanvas([index, extent]);
+    ctx.beginPath();
+    ctx.moveTo(verticalStart[0], verticalStart[1]);
+    ctx.lineTo(verticalEnd[0], verticalEnd[1]);
+    ctx.stroke();
+  }
+
+  const origin = toCanvas([0, 0]);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+  ctx.lineWidth = Math.max(1.5, width * 0.003);
+  ctx.beginPath();
+  ctx.moveTo(origin[0], 18);
+  ctx.lineTo(origin[0], height - 18);
+  ctx.moveTo(18, origin[1]);
+  ctx.lineTo(width - 18, origin[1]);
+  ctx.stroke();
+
+  const basisI = toCanvas(derived.basisI);
+  const basisJ = toCanvas(derived.basisJ);
+  const chipFont = Math.max(10, width * 0.0135);
+  ctx.lineWidth = Math.max(2.2, width * 0.0042);
+  ctx.strokeStyle = "rgba(247, 160, 74, 0.96)";
+  ctx.beginPath();
+  ctx.moveTo(origin[0], origin[1]);
+  ctx.lineTo(basisI[0], basisI[1]);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(115, 221, 213, 0.96)";
+  ctx.beginPath();
+  ctx.moveTo(origin[0], origin[1]);
+  ctx.lineTo(basisJ[0], basisJ[1]);
+  ctx.stroke();
+
+  const weightedI = toCanvas(derived.weightedI);
+  const local = toCanvas(derived.local);
+  const world = toCanvas(derived.world);
+  ctx.setLineDash([8, 7]);
+  ctx.strokeStyle = "rgba(247, 160, 74, 0.68)";
+  ctx.lineWidth = Math.max(1.7, width * 0.0032);
+  ctx.beginPath();
+  ctx.moveTo(origin[0], origin[1]);
+  ctx.lineTo(weightedI[0], weightedI[1]);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(115, 221, 213, 0.68)";
+  ctx.beginPath();
+  ctx.moveTo(weightedI[0], weightedI[1]);
+  ctx.lineTo(local[0], local[1]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (Math.abs(derived.values.point_w) >= 1e-6) {
+    ctx.setLineDash([10, 6]);
+    ctx.strokeStyle = "rgba(255, 223, 132, 0.92)";
+    ctx.beginPath();
+    ctx.moveTo(local[0], local[1]);
+    ctx.lineTo(world[0], world[1]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.fillStyle = "#73ddd5";
+  ctx.beginPath();
+  ctx.arc(world[0], world[1], Math.max(6.5, width * 0.012), 0, TAU);
+  ctx.fill();
+
+  ctx.fillStyle = "#f7a04a";
+  ctx.beginPath();
+  ctx.arc(local[0], local[1], Math.max(5.4, width * 0.0105), 0, TAU);
+  ctx.fill();
+  drawCanvasChip(ctx, "i", basisI[0] + 14, basisI[1] - 14, {
+    fontSize: chipFont,
+    color: "rgba(247, 160, 74, 0.98)",
+  });
+  drawCanvasChip(ctx, "j", basisJ[0] + 14, basisJ[1] - 14, {
+    fontSize: chipFont,
+    color: "rgba(115, 221, 213, 0.98)",
+  });
+  drawCanvasChip(ctx, "p", local[0] + 16, local[1] - 16, {
+    fontSize: chipFont,
+    color: "rgba(247, 160, 74, 0.98)",
+  });
+  if (Math.abs(derived.values.point_w) >= 1e-6) {
+    drawCanvasChip(ctx, "w*t", (local[0] + world[0]) * 0.5, (local[1] + world[1]) * 0.5 - 14, {
+      fontSize: chipFont,
+      color: "rgba(255, 223, 132, 0.98)",
+    });
+    drawCanvasChip(ctx, "p'", world[0] + 16, world[1] - 16, {
+      fontSize: chipFont,
+      color: "rgba(115, 221, 213, 0.98)",
+    });
+  }
+}
+
+function setupVectorsCodeLab() {
+  setupCodeLab({
+    prefix: "vectors-code",
+    schema: [
+      { name: "basis_angle", type: "number" },
+      { name: "basis_scale", type: "vec2" },
+      { name: "point", type: "vec2" },
+      { name: "translate", type: "vec2" },
+      { name: "point_w", type: "number" },
+    ],
+    defaults: {
+      basis_angle: 28,
+      basis_scale: vec2(1.2, 0.92),
+      point: vec2(1.1, 0.55),
+      translate: vec2(0.8, -0.4),
+      point_w: 1,
+    },
+    readoutIds: {
+      basis: "vectors-code-readout-basis",
+      local: "vectors-code-readout-local",
+      homogeneous: "vectors-code-readout-h",
+      world: "vectors-code-readout-world",
+    },
+    evaluate: evaluateVectorsCodeLabBindings,
+    updateUi: updateVectorsCodeLabUi,
+    getStatusMessage(parsed, derived) {
       const translationState =
         Math.abs(derived.values.point_w) < 1e-6
           ? "Translation is inactive because point_w = 0."
           : `Translation contributes ${formatVector(derived.translationOffset, 2)} because point_w = ${formatNumber(derived.values.point_w, 2)}.`;
-      setCodeStatus(
-        status,
-        `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. ${translationState}`
-      );
-      markAllDemosDirty();
-    } catch (error) {
-      setCodeStatus(status, error instanceof Error ? error.message : "Could not parse the lesson bindings.", true);
-    }
-  }
-
-  runButton.addEventListener("click", () => {
-    applySource(input.value);
-  });
-  resetButton.addEventListener("click", () => {
-    input.value = defaultSource;
-    editor.refresh();
-    applySource(defaultSource);
-  });
-  input.addEventListener("input", () => {
-    if (input.value !== state.appliedSource) {
-      setCodeStatus(status, pendingMessage);
-    }
-  });
-  input.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      applySource(input.value);
-    }
-  });
-
-  applySource(defaultSource);
-
-  registerDemo({
-    canvas,
-    visible: true,
-    needsRender: true,
-    render() {
-      resizeCanvasToDisplaySize(canvas);
-      const width = canvas.width;
-      const height = canvas.height;
-      const derived = state.derived;
-      if (!derived) {
-        return;
-      }
-
-      const extent = Math.min(
-        6.2,
-        Math.max(
-          3.2,
-          Math.abs(derived.weightedI[0]) + 0.9,
-          Math.abs(derived.weightedI[1]) + 0.9,
-          Math.abs(derived.local[0]) + 1.1,
-          Math.abs(derived.local[1]) + 1.1,
-          Math.abs(derived.world[0]) + 1.1,
-          Math.abs(derived.world[1]) + 1.1,
-          Math.abs(derived.values.translate[0]) + 0.9,
-          Math.abs(derived.values.translate[1]) + 0.9
-        )
-      );
-      const gridLimit = Math.max(3, Math.min(6, Math.ceil(extent)));
-
-      function toCanvas(point) {
-        return [
-          width * 0.5 + (point[0] / extent) * (width * 0.5 - 26),
-          height * 0.5 - (point[1] / extent) * (height * 0.5 - 26),
-        ];
-      }
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-
-      const background = ctx.createLinearGradient(0, 0, 0, height);
-      background.addColorStop(0, "#102535");
-      background.addColorStop(1, "#183446");
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-      ctx.lineWidth = 1;
-      for (let index = -gridLimit; index <= gridLimit; index += 1) {
-        const horizontalStart = toCanvas([-extent, index]);
-        const horizontalEnd = toCanvas([extent, index]);
-        ctx.beginPath();
-        ctx.moveTo(horizontalStart[0], horizontalStart[1]);
-        ctx.lineTo(horizontalEnd[0], horizontalEnd[1]);
-        ctx.stroke();
-
-        const verticalStart = toCanvas([index, -extent]);
-        const verticalEnd = toCanvas([index, extent]);
-        ctx.beginPath();
-        ctx.moveTo(verticalStart[0], verticalStart[1]);
-        ctx.lineTo(verticalEnd[0], verticalEnd[1]);
-        ctx.stroke();
-      }
-
-      const origin = toCanvas([0, 0]);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
-      ctx.lineWidth = Math.max(1.5, width * 0.003);
-      ctx.beginPath();
-      ctx.moveTo(origin[0], 18);
-      ctx.lineTo(origin[0], height - 18);
-      ctx.moveTo(18, origin[1]);
-      ctx.lineTo(width - 18, origin[1]);
-      ctx.stroke();
-
-      const basisI = toCanvas(derived.basisI);
-      const basisJ = toCanvas(derived.basisJ);
-      const chipFont = Math.max(10, width * 0.0135);
-      ctx.lineWidth = Math.max(2.2, width * 0.0042);
-      ctx.strokeStyle = "rgba(247, 160, 74, 0.96)";
-      ctx.beginPath();
-      ctx.moveTo(origin[0], origin[1]);
-      ctx.lineTo(basisI[0], basisI[1]);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(115, 221, 213, 0.96)";
-      ctx.beginPath();
-      ctx.moveTo(origin[0], origin[1]);
-      ctx.lineTo(basisJ[0], basisJ[1]);
-      ctx.stroke();
-
-      const weightedI = toCanvas(derived.weightedI);
-      const local = toCanvas(derived.local);
-      const world = toCanvas(derived.world);
-      ctx.setLineDash([8, 7]);
-      ctx.strokeStyle = "rgba(247, 160, 74, 0.68)";
-      ctx.lineWidth = Math.max(1.7, width * 0.0032);
-      ctx.beginPath();
-      ctx.moveTo(origin[0], origin[1]);
-      ctx.lineTo(weightedI[0], weightedI[1]);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(115, 221, 213, 0.68)";
-      ctx.beginPath();
-      ctx.moveTo(weightedI[0], weightedI[1]);
-      ctx.lineTo(local[0], local[1]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      if (Math.abs(derived.values.point_w) >= 1e-6) {
-        ctx.setLineDash([10, 6]);
-        ctx.strokeStyle = "rgba(255, 223, 132, 0.92)";
-        ctx.beginPath();
-        ctx.moveTo(local[0], local[1]);
-        ctx.lineTo(world[0], world[1]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      ctx.fillStyle = "#73ddd5";
-      ctx.beginPath();
-      ctx.arc(world[0], world[1], Math.max(6.5, width * 0.012), 0, TAU);
-      ctx.fill();
-
-      ctx.fillStyle = "#f7a04a";
-      ctx.beginPath();
-      ctx.arc(local[0], local[1], Math.max(5.4, width * 0.0105), 0, TAU);
-      ctx.fill();
-      drawCanvasChip(ctx, "i", basisI[0] + 14, basisI[1] - 14, {
-        fontSize: chipFont,
-        color: "rgba(247, 160, 74, 0.98)",
-      });
-      drawCanvasChip(ctx, "j", basisJ[0] + 14, basisJ[1] - 14, {
-        fontSize: chipFont,
-        color: "rgba(115, 221, 213, 0.98)",
-      });
-      drawCanvasChip(ctx, "p", local[0] + 16, local[1] - 16, {
-        fontSize: chipFont,
-        color: "rgba(247, 160, 74, 0.98)",
-      });
-      if (Math.abs(derived.values.point_w) >= 1e-6) {
-        drawCanvasChip(ctx, "w*t", (local[0] + world[0]) * 0.5, (local[1] + world[1]) * 0.5 - 14, {
-          fontSize: chipFont,
-          color: "rgba(255, 223, 132, 0.98)",
-        });
-        drawCanvasChip(ctx, "p'", world[0] + 16, world[1] - 16, {
-          fontSize: chipFont,
-          color: "rgba(115, 221, 213, 0.98)",
-        });
-      }
-
+      return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. ${translationState}`;
     },
+    draw: drawVectorsCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change basis_angle to rotate the coordinate frame\nbasis_angle = 28\nbasis_scale = vec2(1.20, 0.92)\npoint = vec2(1.10, 0.55)\ntranslate = vec2(0.80, -0.40)\npoint_w = 1",
+        instructions: "Rotate the basis by changing basis_angle. Set point_w = 0 to see translation disappear.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: land world point near (2.0, 1.0)\nbasis_angle = 28\nbasis_scale = vec2(1.20, 0.92)\npoint = vec2(1.10, 0.55)\ntranslate = vec2(0.80, -0.40)\npoint_w = 1",
+        instructions: "Adjust the values so the world-space point (cyan dot) lands near (2.0, 1.0).",
+        target: { match(derived) { return Math.abs(derived.world[0] - 2.0) < 0.15 && Math.abs(derived.world[1] - 1.0) < 0.15; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "basis_angle = 28\nbasis_scale = vec2(1.20, 0.92)\npoint = vec2(1.10, 0.55)\ntranslate = vec2(0.80, -0.40)\npoint_w = 1",
+        instructions: "Try expressions like basis_angle = 45 * 2 or point = vec2(cos(0.5), sin(0.5)).",
+      },
+    ],
   });
 }
 
@@ -11311,237 +11583,194 @@ function updateSpacesCodeLabUi(derived, readouts, stepList, loweredOutput) {
   }
 }
 
-function setupSpacesCodeLab() {
-  const canvas = document.getElementById("spaces-code-canvas");
-  const ctx = get2dContext(canvas);
-  const input = document.getElementById("spaces-code-input");
-  const highlight = document.getElementById("spaces-code-highlight");
-  const runButton = document.getElementById("spaces-code-run");
-  const resetButton = document.getElementById("spaces-code-reset");
-  const status = document.getElementById("spaces-code-status");
-  const stepList = document.getElementById("spaces-code-steps");
-  const loweredOutput = document.getElementById("spaces-code-lowered");
-  if (!ctx || !input || !runButton || !resetButton) {
-    return;
+function drawSpacesCodeLab(ctx, canvas, derived) {
+  const width = canvas.width;
+  const height = canvas.height;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const background = ctx.createLinearGradient(0, 0, 0, height);
+  background.addColorStop(0, "#102535");
+  background.addColorStop(1, "#183446");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+
+  const columns = width < 700 ? 3 : 5;
+  const gap = 14;
+  const margin = 18;
+  const rows = Math.ceil(derived.stages.length / columns);
+  const boxWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
+  const boxHeight = (height - margin * 2 - gap * (rows - 1)) / rows;
+  const stageRects = [];
+
+  for (let index = 0; index < derived.stages.length; index += 1) {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    stageRects.push({
+      x: margin + column * (boxWidth + gap),
+      y: margin + row * (boxHeight + gap),
+      width: boxWidth,
+      height: boxHeight,
+    });
   }
 
-  const readouts = {
-    object: document.getElementById("spaces-code-readout-object"),
-    world: document.getElementById("spaces-code-readout-world"),
-    view: document.getElementById("spaces-code-readout-view"),
-    clip: document.getElementById("spaces-code-readout-clip"),
-    ndc: document.getElementById("spaces-code-readout-ndc"),
-    pixel: document.getElementById("spaces-code-readout-pixel"),
-  };
-  const defaultSource = input.value;
-  const schema = [
-    { name: "object", type: "vec3" },
-    { name: "model_translate", type: "vec3" },
-    { name: "model_rotate_y", type: "number" },
-    { name: "fov", type: "number" },
-  ];
-  const defaults = {
-    object: vec3(0.88, 0.44, 1.08),
-    model_translate: vec3(1.2, -0.18, -0.7),
-    model_rotate_y: 32,
-    fov: 52,
-  };
-  const state = {
-    appliedSource: defaultSource,
-    derived: null,
-  };
-  const pendingMessage = "Edits pending. Press Run or use Cmd/Ctrl+Enter to apply changes.";
-  const editor = setupLessonCodeEditor(input, highlight);
+  if (rows === 1) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = Math.max(1.5, width * 0.0028);
+    for (let index = 0; index < stageRects.length - 1; index += 1) {
+      const left = stageRects[index];
+      const right = stageRects[index + 1];
+      const startX = left.x + left.width + 6;
+      const startY = left.y + left.height * 0.5;
+      const endX = right.x - 6;
+      const endY = right.y + right.height * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
+  }
 
-  function applySource(source) {
-    try {
-      const parsed = parseLessonBindings(source, schema, defaults);
-      const derived = evaluateSpacesCodeLabBindings(parsed.values);
-      state.appliedSource = source;
-      state.derived = derived;
-      updateSpacesCodeLabUi(derived, readouts, stepList, loweredOutput);
-      setCodeStatus(
-        status,
-        `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. Clip space still carries w = ${formatNumber(derived.clip[3], 2)} until the divide produces NDC.`
+  for (let index = 0; index < derived.stages.length; index += 1) {
+    const stage = derived.stages[index];
+    const rect = stageRects[index];
+    const plotX = rect.x + 12;
+    const plotY = rect.y + 32;
+    const plotWidth = rect.width - 24;
+    const plotHeight = rect.height - 44;
+    const stageValue = stage.value;
+
+    let extentX = 1.4;
+    let extentY = 1.4;
+    if (stage.label === "Clip") {
+      extentX = Math.max(1.2, Math.abs(derived.clip[3]) * 1.2, Math.abs(stageValue[0]) * 1.15);
+      extentY = Math.max(1.2, Math.abs(derived.clip[3]) * 1.2, Math.abs(stageValue[1]) * 1.15);
+    } else if (stage.label === "NDC") {
+      extentX = 1.15;
+      extentY = 1.15;
+    } else {
+      extentX = Math.max(1.35, Math.abs(stageValue[0]) * 1.2, Math.abs(stageValue[1]) * 1.2);
+      extentY = Math.max(1.35, Math.abs(stageValue[0]) * 0.95, Math.abs(stageValue[1]) * 1.2);
+    }
+
+    function toStageCanvas(point) {
+      return [
+        plotX + plotWidth * 0.5 + (point[0] / extentX) * (plotWidth * 0.5 - 8),
+        plotY + plotHeight * 0.5 - (point[1] / extentY) * (plotHeight * 0.5 - 8),
+      ];
+    }
+
+    ctx.fillStyle = "rgba(8, 21, 30, 0.26)";
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+    ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+    ctx.font = `${Math.max(10, width * 0.014)}px "Avenir Next", "Segoe UI", sans-serif`;
+    ctx.fillText(stage.label, rect.x + 12, rect.y + 20);
+
+    const leftAxis = toStageCanvas([-extentX, 0]);
+    const rightAxis = toStageCanvas([extentX, 0]);
+    const topAxis = toStageCanvas([0, extentY]);
+    const bottomAxis = toStageCanvas([0, -extentY]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.beginPath();
+    ctx.moveTo(leftAxis[0], leftAxis[1]);
+    ctx.lineTo(rightAxis[0], rightAxis[1]);
+    ctx.moveTo(topAxis[0], topAxis[1]);
+    ctx.lineTo(bottomAxis[0], bottomAxis[1]);
+    ctx.stroke();
+
+    if (stage.label === "Clip") {
+      const clipW = Math.max(Math.abs(derived.clip[3]), 0.2);
+      const topLeft = toStageCanvas([-clipW, clipW]);
+      const bottomRight = toStageCanvas([clipW, -clipW]);
+      ctx.strokeStyle = "rgba(248, 179, 125, 0.9)";
+      ctx.strokeRect(
+        topLeft[0],
+        topLeft[1],
+        bottomRight[0] - topLeft[0],
+        bottomRight[1] - topLeft[1]
       );
-      markAllDemosDirty();
-    } catch (error) {
-      setCodeStatus(status, error instanceof Error ? error.message : "Could not parse the lesson bindings.", true);
     }
+
+    if (stage.label === "NDC") {
+      const topLeft = toStageCanvas([-1, 1]);
+      const bottomRight = toStageCanvas([1, -1]);
+      ctx.strokeStyle = "rgba(115, 221, 213, 0.9)";
+      ctx.strokeRect(
+        topLeft[0],
+        topLeft[1],
+        bottomRight[0] - topLeft[0],
+        bottomRight[1] - topLeft[1]
+      );
+    }
+
+    const center = toStageCanvas([0, 0]);
+    const point = toStageCanvas(stageValue);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+    ctx.lineWidth = Math.max(1.3, width * 0.0024);
+    ctx.beginPath();
+    ctx.moveTo(center[0], center[1]);
+    ctx.lineTo(point[0], point[1]);
+    ctx.stroke();
+
+    ctx.fillStyle = stage.color;
+    ctx.beginPath();
+    ctx.arc(point[0], point[1], Math.max(4.5, width * 0.0065), 0, TAU);
+    ctx.fill();
   }
+}
 
-  runButton.addEventListener("click", () => {
-    applySource(input.value);
-  });
-  resetButton.addEventListener("click", () => {
-    input.value = defaultSource;
-    editor.refresh();
-    applySource(defaultSource);
-  });
-  input.addEventListener("input", () => {
-    if (input.value !== state.appliedSource) {
-      setCodeStatus(status, pendingMessage);
-    }
-  });
-  input.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      applySource(input.value);
-    }
-  });
-
-  applySource(defaultSource);
-
-  registerDemo({
-    canvas,
-    visible: true,
-    needsRender: true,
-    render() {
-      resizeCanvasToDisplaySize(canvas);
-      const width = canvas.width;
-      const height = canvas.height;
-      const derived = state.derived;
-      if (!derived) {
-        return;
-      }
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-
-      const background = ctx.createLinearGradient(0, 0, 0, height);
-      background.addColorStop(0, "#102535");
-      background.addColorStop(1, "#183446");
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, width, height);
-
-      const columns = width < 700 ? 3 : 5;
-      const gap = 14;
-      const margin = 18;
-      const rows = Math.ceil(derived.stages.length / columns);
-      const boxWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
-      const boxHeight = (height - margin * 2 - gap * (rows - 1)) / rows;
-      const stageRects = [];
-
-      for (let index = 0; index < derived.stages.length; index += 1) {
-        const column = index % columns;
-        const row = Math.floor(index / columns);
-        stageRects.push({
-          x: margin + column * (boxWidth + gap),
-          y: margin + row * (boxHeight + gap),
-          width: boxWidth,
-          height: boxHeight,
-        });
-      }
-
-      if (rows === 1) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
-        ctx.lineWidth = Math.max(1.5, width * 0.0028);
-        for (let index = 0; index < stageRects.length - 1; index += 1) {
-          const left = stageRects[index];
-          const right = stageRects[index + 1];
-          const startX = left.x + left.width + 6;
-          const startY = left.y + left.height * 0.5;
-          const endX = right.x - 6;
-          const endY = right.y + right.height * 0.5;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(endX, endY);
-          ctx.stroke();
-        }
-      }
-
-      for (let index = 0; index < derived.stages.length; index += 1) {
-        const stage = derived.stages[index];
-        const rect = stageRects[index];
-        const plotX = rect.x + 12;
-        const plotY = rect.y + 32;
-        const plotWidth = rect.width - 24;
-        const plotHeight = rect.height - 44;
-        const stageValue = stage.value;
-
-        let extentX = 1.4;
-        let extentY = 1.4;
-        if (stage.label === "Clip") {
-          extentX = Math.max(1.2, Math.abs(derived.clip[3]) * 1.2, Math.abs(stageValue[0]) * 1.15);
-          extentY = Math.max(1.2, Math.abs(derived.clip[3]) * 1.2, Math.abs(stageValue[1]) * 1.15);
-        } else if (stage.label === "NDC") {
-          extentX = 1.15;
-          extentY = 1.15;
-        } else {
-          extentX = Math.max(1.35, Math.abs(stageValue[0]) * 1.2, Math.abs(stageValue[1]) * 1.2);
-          extentY = Math.max(1.35, Math.abs(stageValue[0]) * 0.95, Math.abs(stageValue[1]) * 1.2);
-        }
-
-        function toStageCanvas(point) {
-          return [
-            plotX + plotWidth * 0.5 + (point[0] / extentX) * (plotWidth * 0.5 - 8),
-            plotY + plotHeight * 0.5 - (point[1] / extentY) * (plotHeight * 0.5 - 8),
-          ];
-        }
-
-        ctx.fillStyle = "rgba(8, 21, 30, 0.26)";
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-        ctx.font = `${Math.max(10, width * 0.014)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.fillText(stage.label, rect.x + 12, rect.y + 20);
-
-        const leftAxis = toStageCanvas([-extentX, 0]);
-        const rightAxis = toStageCanvas([extentX, 0]);
-        const topAxis = toStageCanvas([0, extentY]);
-        const bottomAxis = toStageCanvas([0, -extentY]);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
-        ctx.beginPath();
-        ctx.moveTo(leftAxis[0], leftAxis[1]);
-        ctx.lineTo(rightAxis[0], rightAxis[1]);
-        ctx.moveTo(topAxis[0], topAxis[1]);
-        ctx.lineTo(bottomAxis[0], bottomAxis[1]);
-        ctx.stroke();
-
-        if (stage.label === "Clip") {
-          const clipW = Math.max(Math.abs(derived.clip[3]), 0.2);
-          const topLeft = toStageCanvas([-clipW, clipW]);
-          const bottomRight = toStageCanvas([clipW, -clipW]);
-          ctx.strokeStyle = "rgba(248, 179, 125, 0.9)";
-          ctx.strokeRect(
-            topLeft[0],
-            topLeft[1],
-            bottomRight[0] - topLeft[0],
-            bottomRight[1] - topLeft[1]
-          );
-        }
-
-        if (stage.label === "NDC") {
-          const topLeft = toStageCanvas([-1, 1]);
-          const bottomRight = toStageCanvas([1, -1]);
-          ctx.strokeStyle = "rgba(115, 221, 213, 0.9)";
-          ctx.strokeRect(
-            topLeft[0],
-            topLeft[1],
-            bottomRight[0] - topLeft[0],
-            bottomRight[1] - topLeft[1]
-          );
-        }
-
-        const center = toStageCanvas([0, 0]);
-        const point = toStageCanvas(stageValue);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
-        ctx.lineWidth = Math.max(1.3, width * 0.0024);
-        ctx.beginPath();
-        ctx.moveTo(center[0], center[1]);
-        ctx.lineTo(point[0], point[1]);
-        ctx.stroke();
-
-        ctx.fillStyle = stage.color;
-        ctx.beginPath();
-        ctx.arc(point[0], point[1], Math.max(4.5, width * 0.0065), 0, TAU);
-        ctx.fill();
-
-      }
+function setupSpacesCodeLab() {
+  setupCodeLab({
+    prefix: "spaces-code",
+    schema: [
+      { name: "object", type: "vec3" },
+      { name: "model_translate", type: "vec3" },
+      { name: "model_rotate_y", type: "number" },
+      { name: "fov", type: "number" },
+    ],
+    defaults: {
+      object: vec3(0.88, 0.44, 1.08),
+      model_translate: vec3(1.2, -0.18, -0.7),
+      model_rotate_y: 32,
+      fov: 52,
     },
+    readoutIds: {
+      object: "spaces-code-readout-object",
+      world: "spaces-code-readout-world",
+      view: "spaces-code-readout-view",
+      clip: "spaces-code-readout-clip",
+      ndc: "spaces-code-readout-ndc",
+      pixel: "spaces-code-readout-pixel",
+    },
+    evaluate: evaluateSpacesCodeLabBindings,
+    updateUi: updateSpacesCodeLabUi,
+    getStatusMessage(parsed, derived) {
+      return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. Clip space still carries w = ${formatNumber(derived.clip[3], 2)} until the divide produces NDC.`;
+    },
+    draw: drawSpacesCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change fov to see the projection change\nobject = vec3(0.88, 0.44, 1.08)\nmodel_translate = vec3(1.20, -0.18, -0.70)\nmodel_rotate_y = 32\nfov = 52",
+        instructions: "Change model_rotate_y to spin the object in world space. Widen fov to see the clip and NDC values shift.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: get the pixel near the viewport center (320, 180)\nobject = vec3(0.88, 0.44, 1.08)\nmodel_translate = vec3(1.20, -0.18, -0.70)\nmodel_rotate_y = 32\nfov = 52",
+        instructions: "Adjust model_translate and model_rotate_y so the final pixel lands near (320, 180) in the 640x360 viewport.",
+        target: { match(derived) { return Math.abs(derived.pixel[0] - 320) < 30 && Math.abs(derived.pixel[1] - 180) < 30; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "object = vec3(0.88, 0.44, 1.08)\nmodel_translate = vec3(1.20, -0.18, -0.70)\nmodel_rotate_y = 32\nfov = 52",
+        instructions: "Try expressions like model_rotate_y = 45 + 30 or fov = 90 - 20.",
+      },
+    ],
   });
 }
 
@@ -11737,7 +11966,7 @@ function drawNormalCodeLab(ctx, canvas, derived) {
 }
 
 function setupNormalCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "normal-code",
     schema: [
       { name: "surface_angle", type: "number" },
@@ -11763,6 +11992,24 @@ function setupNormalCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. Diffuse is ${formatNumber(derived.diffuse, 3)} with the ${derived.values.fix_normal_matrix ? "corrected" : "naive"} shader normal.`;
     },
     draw: drawNormalCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change surface_angle and watch the normal rotate\nsurface_angle = 18\nlight_angle = 42\nscale = vec2(1.80, 0.52)\nfix_normal_matrix = true",
+        instructions: "Change surface_angle to rotate the patch. Toggle fix_normal_matrix between true and false to see the bug appear.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: get diffuse >= 0.85 with fix OFF\nsurface_angle = 18\nlight_angle = 42\nscale = vec2(1.80, 0.52)\nfix_normal_matrix = false",
+        instructions: "With fix_normal_matrix = false, adjust the angles until the diffuse term reaches at least 0.85.",
+        target: { match(derived) { return !derived.values.fix_normal_matrix && derived.diffuse >= 0.85; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "surface_angle = 18\nlight_angle = 42\nscale = vec2(1.80, 0.52)\nfix_normal_matrix = true",
+        instructions: "Try any values. Use expressions like light_angle = 30 + 15 or scale = vec2(cos(0.5) * 2, 1.0).",
+      },
+    ],
   });
 }
 
@@ -12255,7 +12502,7 @@ function setupTbnLabDemo() {
 }
 
 function setupShaderCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "shader-code",
     schema: [
       { name: "wave_height", type: "number" },
@@ -12281,6 +12528,24 @@ function setupShaderCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. The center vertex moves by ${formatNumber(derived.centerWave, 3)}, while the fragment color stays a separate stage decision.`;
     },
     draw: drawShaderCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change wave_height to see the mesh deform\nwave_height = 0.32\nwave_density = 12\ncolor_shift = 0.44\ntime = 0.6",
+        instructions: "Increase wave_height to exaggerate the displacement. Change time to slide the animation forward or back.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: make the center wave offset exceed 0.25\nwave_height = 0.10\nwave_density = 6\ncolor_shift = 0.44\ntime = 0.6",
+        instructions: "Adjust wave_height and wave_density so the center vertex displacement exceeds 0.25.",
+        target: { match(derived) { return Math.abs(derived.centerWave) > 0.25; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "wave_height = 0.32\nwave_density = 12\ncolor_shift = 0.44\ntime = 0.6",
+        instructions: "Try expressions like wave_height = sin(0.8) * 0.5 or wave_density = 6 + 8.",
+      },
+    ],
   });
 }
 
@@ -12461,7 +12726,7 @@ function drawRenderingCodeLab(ctx, canvas, derived) {
 }
 
 function setupRenderingCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "rendering-code",
     schema: [
       { name: "front_depth", type: "number" },
@@ -12489,6 +12754,24 @@ function setupRenderingCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. ${derived.winnerLabel} owns the pixel when ${derived.values.depth_test ? "depth testing is on" : "draw order decides the winner"}.`;
     },
     draw: drawRenderingCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change depth values to see which fragment wins\nfront_depth = 0.34\nback_depth = 0.62\nfront_color = vec3(0.22, 0.74, 0.94)\nback_color = vec3(0.96, 0.62, 0.34)\ndepth_test = true",
+        instructions: "Swap front_depth and back_depth to reverse which fragment is closer. Toggle depth_test to false to see draw-order win.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: make the back (orange) fragment win WITH depth test on\nfront_depth = 0.34\nback_depth = 0.62\nfront_color = vec3(0.22, 0.74, 0.94)\nback_color = vec3(0.96, 0.62, 0.34)\ndepth_test = true",
+        instructions: "Keep depth_test = true but make the back fragment win the depth test.",
+        target: { match(derived) { return derived.values.depth_test && derived.winnerLabel === "Back fragment"; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "front_depth = 0.34\nback_depth = 0.62\nfront_color = vec3(0.22, 0.74, 0.94)\nback_color = vec3(0.96, 0.62, 0.34)\ndepth_test = true",
+        instructions: "Try expressions like front_depth = 0.2 + 0.3 or front_color = vec3(sin(1.0), 0.5, cos(0.3)).",
+      },
+    ],
   });
 }
 
@@ -12690,7 +12973,7 @@ function drawProjectionCodeLab(ctx, canvas, derived) {
 }
 
 function setupProjectionCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "projection-code",
     schema: [
       { name: "perspective", type: "bool" },
@@ -12716,6 +12999,24 @@ function setupProjectionCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. ${derived.values.perspective ? "Perspective" : "Orthographic"} mode gives a near/far size ratio of ${formatNumber(derived.ratio, 2)}x.`;
     },
     draw: drawProjectionCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change fov to see foreshortening change\nperspective = true\nfov = 56\ncamera_distance = 4.4\northo_height = 1.9",
+        instructions: "Widen fov to exaggerate perspective. Switch perspective = false to see orthographic projection flatten the scene.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: get the near/far ratio above 2.0x in perspective mode\nperspective = true\nfov = 56\ncamera_distance = 4.4\northo_height = 1.9",
+        instructions: "Stay in perspective mode and push the near/far size ratio above 2.0x.",
+        target: { match(derived) { return derived.values.perspective && derived.ratio > 2.0; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "perspective = true\nfov = 56\ncamera_distance = 4.4\northo_height = 1.9",
+        instructions: "Try expressions like fov = 30 + 40 or camera_distance = sqrt(20).",
+      },
+    ],
   });
 }
 
@@ -12888,7 +13189,7 @@ function drawTextureCodeLab(ctx, canvas, derived) {
 }
 
 function setupTextureCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "texture-code",
     schema: [
       { name: "uv", type: "vec2" },
@@ -12912,6 +13213,24 @@ function setupTextureCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. The sampler is using ${derived.values.linear_filter ? "linear filtering" : "nearest filtering"} at wrapped uv ${formatVector(derived.wrappedUv, 2)}.`;
     },
     draw: drawTextureCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Change uv to move the sample point\nuv = vec2(0.62, 0.34)\nuv_scale = 6\nlinear_filter = true",
+        instructions: "Move uv around to sample different texels. Toggle linear_filter to see the difference between nearest and bilinear sampling.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: land exactly on texel (3, 3) with nearest filter\nuv = vec2(0.62, 0.34)\nuv_scale = 1\nlinear_filter = false",
+        instructions: "With linear_filter = false and uv_scale = 1, set uv so the nearest texel is (3, 3).",
+        target: { match(derived) { return !derived.values.linear_filter && derived.nearest[0] === 3 && derived.nearest[1] === 3; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "uv = vec2(0.62, 0.34)\nuv_scale = 6\nlinear_filter = true",
+        instructions: "Try expressions like uv = vec2(sin(1.0) * 0.5 + 0.5, cos(0.5) * 0.5 + 0.5).",
+      },
+    ],
   });
 }
 
@@ -13099,7 +13418,7 @@ function drawMaterialCodeLab(ctx, canvas, derived) {
 }
 
 function setupMaterialCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "material-code",
     schema: [
       { name: "normal_angle", type: "number" },
@@ -13127,6 +13446,24 @@ function setupMaterialCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. Diffuse is ${formatNumber(derived.diffuse, 3)} and specular is ${formatNumber(derived.specular, 3)}.`;
     },
     draw: drawMaterialCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Rotate the light to see diffuse change\nnormal_angle = 28\nlight_angle = 38\nview_angle = 12\nspecular_strength = 0.48\nshininess = 36",
+        instructions: "Move light_angle toward normal_angle to increase diffuse. Raise shininess to tighten the specular highlight.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: get specular > 0.40\nnormal_angle = 28\nlight_angle = 38\nview_angle = 12\nspecular_strength = 0.48\nshininess = 36",
+        instructions: "Adjust the angles and specular_strength so the specular term exceeds 0.40.",
+        target: { match(derived) { return derived.specular > 0.40; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "normal_angle = 28\nlight_angle = 38\nview_angle = 12\nspecular_strength = 0.48\nshininess = 36",
+        instructions: "Try aligning all three angles. Use expressions like light_angle = normal_angle + 5.",
+      },
+    ],
   });
 }
 
@@ -13264,7 +13601,7 @@ function drawShadowCodeLab(ctx, canvas, derived) {
 }
 
 function setupShadowCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "shadow-code",
     schema: [
       { name: "shadow_map_depth", type: "number" },
@@ -13290,6 +13627,24 @@ function setupShadowCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. The surface keeps ${formatNumber(derived.litFactor, 2)} of its direct light after the shadow compare.`;
     },
     draw: drawShadowCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Adjust bias to fix shadow acne\nshadow_map_depth = 0.44\nreceiver_depth = 0.47\nbias = 0.02\nsoft_filter = true",
+        instructions: "Lower bias toward 0 to see shadow acne appear. Raise it to push the artifact away. Toggle soft_filter to compare hard vs soft shadows.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: surface fully lit (shadow factor = 0)\nshadow_map_depth = 0.44\nreceiver_depth = 0.47\nbias = 0.02\nsoft_filter = true",
+        instructions: "Adjust the values so the surface is fully lit (shadow factor = 0, lit factor = 1).",
+        target: { match(derived) { return derived.shadowFactor < 0.01; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "shadow_map_depth = 0.44\nreceiver_depth = 0.47\nbias = 0.02\nsoft_filter = true",
+        instructions: "Try expressions like bias = shadow_map_depth * 0.05 or receiver_depth = shadow_map_depth + 0.1.",
+      },
+    ],
   });
 }
 
@@ -13506,7 +13861,7 @@ function drawCompareCodeLab(ctx, canvas, derived) {
 }
 
 function setupCompareCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "compare-code",
     schema: [
       { name: "sample", type: "number" },
@@ -13532,6 +13887,24 @@ function setupCompareCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. Both methods agree that ${derived.winner} owns the current sample.`;
     },
     draw: drawCompareCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Move sample across the image\nsample = 0.48\nobject_drift = 0.06\ncast_shadow = true\ncast_reflection = true",
+        instructions: "Slide sample between 0 and 1 to see different objects get hit. Toggle cast_shadow and cast_reflection to add secondary rays.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: hit the background (no object)\nsample = 0.48\nobject_drift = 0.06\ncast_shadow = true\ncast_reflection = true",
+        instructions: "Adjust sample and object_drift so the primary ray hits the background (no object).",
+        target: { match(derived) { return derived.winner === "background"; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "sample = 0.48\nobject_drift = 0.06\ncast_shadow = true\ncast_reflection = true",
+        instructions: "Try expressions like sample = 0.25 + 0.25 or object_drift = sin(0.5) * 0.2.",
+      },
+    ],
   });
 }
 
@@ -13671,7 +14044,7 @@ function drawColorCodeLab(ctx, canvas, derived) {
 }
 
 function setupColorCodeLab() {
-  setupStructuredCodeLab({
+  setupCodeLab({
     prefix: "color-code",
     schema: [
       { name: "exposure", type: "number" },
@@ -13697,6 +14070,24 @@ function setupColorCodeLab() {
       return `Applied ${parsed.appliedCount} binding${parsed.appliedCount === 1 ? "" : "s"}. The linear peak is ${formatNumber(derived.linearSamples[derived.linearSamples.length - 1], 2)} before display preparation.`;
     },
     draw: drawColorCodeLab,
+    levels: [
+      {
+        id: "guided", label: "Guided",
+        source: "# Raise exposure to push values past 1.0\nexposure = 1.0\nscene_peak = 3.8\ntone_map = true\ngamma = 2.2",
+        instructions: "Raise exposure above 1 to see bright values clip. Toggle tone_map to false to see hard clipping vs smooth compression.",
+      },
+      {
+        id: "challenge", label: "Challenge",
+        source: "# Goal: display peak above 0.90 with tone mapping ON\nexposure = 1.0\nscene_peak = 3.8\ntone_map = true\ngamma = 2.2",
+        instructions: "With tone_map = true, adjust exposure so the brightest display sample exceeds 0.90.",
+        target: { match(derived) { return derived.values.tone_map && derived.displaySamples[derived.displaySamples.length - 1] > 0.90; } },
+      },
+      {
+        id: "explore", label: "Explore",
+        source: "exposure = 1.0\nscene_peak = 3.8\ntone_map = true\ngamma = 2.2",
+        instructions: "Try expressions like exposure = pow(2, 1.5) or gamma = 1.0 + 1.2.",
+      },
+    ],
   });
 }
 

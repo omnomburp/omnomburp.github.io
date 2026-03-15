@@ -1231,10 +1231,28 @@ input[type="checkbox"]:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.reinforcement-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
 .mini-canvas-card {
   padding: 1rem;
   display: grid;
   gap: 0.7rem;
+}
+
+.card-code {
+  margin: 0;
+}
+
+.card-code code {
+  display: inline-flex;
+  align-items: center;
+  white-space: normal;
+  padding: 0.32rem 0.62rem;
+  border-radius: 14px;
 }
 
 .code-block {
@@ -1742,6 +1760,7 @@ input[type="checkbox"]:focus-visible {
   .callout-grid,
   .chapter-pagination,
   .space-trio,
+  .reinforcement-grid,
   .controls-grid,
   .chapter-grid,
   .code-lab-breakdown,
@@ -1871,6 +1890,7 @@ input[type="checkbox"]:focus-visible {
   .callout-grid,
   .chapter-pagination,
   .space-trio,
+  .reinforcement-grid,
   .controls-grid,
   .code-lab-notes,
   .code-lab-breakdown,

@@ -48,6 +48,8 @@
           <div class="outline-list">
             <a href="#foundations">Foundations</a>
             <a href="#game-vectors">Game intuition</a>
+            <a href="#dot-cross">Dot and cross</a>
+            <a href="#vector-uses">More uses</a>
             <a href="#mental-model">Mental model</a>
             <a href="#matrix-reading">Read a matrix</a>
             <a href="#rebuild">Rebuild a point</a>
@@ -238,6 +240,128 @@
                 <p>The same meanings keep showing up later as light directions, view directions, camera offsets, and local basis axes.</p>
               </article>
             </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="dot-cross">
+          <div class="section-header">
+            <p class="eyebrow">Vector Relations</p>
+            <h2>Dot compares directions. Cross builds what is perpendicular.</h2>
+            <p>
+              These two operations keep showing up because graphics constantly asks two questions: “how aligned are
+              these directions?” and “what direction sticks out of this surface?” The dot product answers the first.
+              The cross product answers the second.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="dot-cross-canvas" class="canvas-stage" aria-label="Dot and cross product explainer"></canvas>
+            <p class="canvas-caption">Left: dot tests whether a target is in front of the player. Right: crossing two triangle edges produces a surface normal.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Dot product</h3>
+              <p>With unit vectors, dot is an alignment score: <code>1</code> means same way, <code>0</code> means sideways, and negative means opposite.</p>
+              <code>dot(a, b)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Graphics uses for dot</h3>
+              <p>It powers diffuse lighting, front-versus-behind tests, and projections onto an axis.</p>
+              <code>brightness = max(dot(n, l), 0)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Cross product</h3>
+              <p>Cross returns a vector perpendicular to both inputs, so it can turn two edge directions into one surface-facing direction.</p>
+              <code>cross(a, b)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Graphics uses for cross</h3>
+              <p>It builds triangle normals, camera side axes, and winding-based facing tests.</p>
+              <code>n = normalize(cross(e1, e2))</code>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Normalize before reading dot as pure alignment</h3>
+                <p>If lengths are still mixed in, the value is no longer just about angle. In lighting, that usually creates the wrong intuition.</p>
+              </li>
+              <li>
+                <h3>Dot answers a yes-no style gameplay question very well</h3>
+                <p>Is the enemy in front of the player? Is the flashlight hitting this patch head-on? Dot is the fast alignment test behind both questions.</p>
+              </li>
+              <li>
+                <h3>Cross depends on order</h3>
+                <p><code>cross(a, b)</code> points the opposite way from <code>cross(b, a)</code>. That is why triangle winding changes which side of a surface is considered the front.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="formula-card">
+                <span class="formula-label">Unit vectors</span>
+                <code>dot(a, b) = cos(theta)</code>
+              </article>
+              <article class="formula-card">
+                <span class="formula-label">Order matters</span>
+                <code>cross(b, a) = -cross(a, b)</code>
+              </article>
+              <article class="mini-card">
+                <h3>Why this belongs in graphics</h3>
+                <p>Chapter 3 will use dot for light response constantly. Cross is how surfaces and camera frames recover a perpendicular direction from geometry.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="vector-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>See the same vector tools do four different jobs</h2>
+            <p>
+              A concept usually clicks when it survives a few context changes. These short examples reuse the same
+              vector ideas in movement, steering, facing tests, and surface construction so the chapter does not leave
+              them behind after one explanation.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Subtract points to get a useful offset</h3>
+              <div class="canvas-card">
+                <canvas id="vector-offset-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Offset from point subtraction example"></canvas>
+              </div>
+              <p>The same subtraction that gives a chase arrow can also drive pickups, AI steering, and knockback direction.</p>
+              <p class="card-code"><code>toPickup = pickup - player</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Normalize when you only want direction</h3>
+              <div class="canvas-card">
+                <canvas id="vector-normalize-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normalization removes length example"></canvas>
+              </div>
+              <p>The raw input arrow can get longer or shorter, but the unit vector keeps only orientation, which is what movement and lighting often want.</p>
+              <p class="card-code"><code>moveDir = normalize(input)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Dot answers “is it in front?”</h3>
+              <div class="canvas-card">
+                <canvas id="vector-dot-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Dot product front test example"></canvas>
+              </div>
+              <p>One direction says where the player is facing. Another says where the target is. Dot compares them without needing a full angle calculation.</p>
+              <p class="card-code"><code>dot(forward, toTarget)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Cross turns two edges into a normal</h3>
+              <div class="canvas-card">
+                <canvas id="vector-cross-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Cross product surface normal example"></canvas>
+              </div>
+              <p>Triangles do not store “front” as a magical property. Two edge directions can build the surface-facing normal explicitly.</p>
+              <p class="card-code"><code>normal = cross(e1, e2)</code></p>
+            </article>
           </div>
         </section>
 
@@ -786,7 +910,7 @@ point_w = 1</textarea>
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Vector, basis, coordinate frame, homogeneous coordinate, transform, scale, rotation, shear, composition.</p>
+              <p>Vector, basis, coordinate frame, dot product, cross product, homogeneous coordinate, transform, scale, rotation, shear, composition.</p>
             </article>
           </div>
         </section>

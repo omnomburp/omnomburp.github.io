@@ -49,6 +49,7 @@
             <a href="#space-contract">Space contract</a>
             <a href="#game-spaces">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#space-uses">More uses</a>
             <a href="#space-map">Where transforms act</a>
             <a href="#camera-frame">View matrix</a>
             <a href="#clip-space">Clip space</a>
@@ -272,6 +273,55 @@
               <span class="step-number">4</span>
               <h3>Clip space prepares the divide</h3>
               <p>Projection first produces a homogeneous clip coordinate. Only after dividing by <code>w</code> do you land in normalized device coordinates.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="space-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>Reuse the spaces in concrete rendering and gameplay tasks</h2>
+            <p>
+              Coordinate spaces stop feeling arbitrary once you see why different jobs prefer different frames. These
+              compact examples repeat the chapter’s spaces in the kinds of tasks that actually show up in an engine.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Object space keeps attachments simple</h3>
+              <div class="canvas-card">
+                <canvas id="space-attachment-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Object space attachment example"></canvas>
+              </div>
+              <p>A muzzle socket or hand socket is easiest to author in the model’s own local frame, then transform with the rest of the asset.</p>
+              <p class="card-code"><code>socketWorld = M * socketLocal</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>World space is where distance makes sense</h3>
+              <div class="canvas-card">
+                <canvas id="space-world-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="World space distance example"></canvas>
+              </div>
+              <p>AI range checks, collisions, and navigation want objects expressed in one shared scene frame before any camera rewrite happens.</p>
+              <p class="card-code"><code>enemyWorld - playerWorld</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>View space rewrites around the camera</h3>
+              <div class="canvas-card">
+                <canvas id="space-view-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="View space rewrite example"></canvas>
+              </div>
+              <p>The target is still the same object, but the useful question becomes “where is it relative to the camera now?”</p>
+              <p class="card-code"><code>targetView = V * targetWorld</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>NDC and pixels are screen-facing spaces</h3>
+              <div class="canvas-card">
+                <canvas id="space-screen-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="NDC to pixel mapping example"></canvas>
+              </div>
+              <p>After the divide by <code>w</code>, the point finally lives in the fixed screen-ready box that the viewport maps into pixels.</p>
+              <p class="card-code"><code>pixel = viewport(ndc)</code></p>
             </article>
           </div>
         </section>

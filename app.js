@@ -3278,6 +3278,350 @@ function setupGameSpacesStoryDemo() {
   });
 }
 
+function setupSpaceAttachmentUseDemo() {
+  const canvas = document.getElementById("space-attachment-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const shipLocal = [
+    [-0.72, -0.32],
+    [0.88, 0],
+    [-0.72, 0.32],
+    [-0.24, 0],
+  ];
+  const socketLocal = [0.54, 0];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.12 : time * 0.8;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const worldCenter = [0.12 + Math.cos(phase * 0.74) * 0.44, -0.04 + Math.sin(phase * 0.66) * 0.34];
+      const shipAngle = phase * 0.86;
+      const socketWorld = add2(worldCenter, rotate2(socketLocal, shipAngle));
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(rect, point, extentX, extentY) {
+        return projectRectPoint(rect, point, extentX, extentY, 14, 18, 0.6);
+      }
+
+      function drawShip(rect, center, angle, extentX, extentY, fill, stroke) {
+        ctx.beginPath();
+        for (let index = 0; index < shipLocal.length; index += 1) {
+          const point = add2(center, rotate2(shipLocal[index], angle));
+          const projected = project(rect, point, extentX, extentY);
+          if (index === 0) {
+            ctx.moveTo(projected[0], projected[1]);
+          } else {
+            ctx.lineTo(projected[0], projected[1]);
+          }
+        }
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = Math.max(1.8, width * 0.0028);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      drawLessonCanvasPanel(ctx, leftRect, "Local", width);
+      drawRectAxesGrid(ctx, leftRect, 1.9, 1.6, width, 0.6);
+      drawShip(leftRect, [0, 0], 0, 1.9, 1.6, "rgba(247, 160, 74, 0.22)", "rgba(247, 160, 74, 0.96)");
+      const localOrigin = project(leftRect, [0, 0], 1.9, 1.6);
+      const localSocketCanvas = project(leftRect, socketLocal, 1.9, 1.6);
+      drawArrow2d(ctx, localOrigin, localSocketCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2.1, width * 0.003));
+      drawCanvasDot(ctx, localSocketCanvas, Math.max(5.5, width * 0.0065), "rgba(115, 221, 213, 0.96)");
+      drawCanvasChip(ctx, "socket", localSocketCanvas[0] + 16, localSocketCanvas[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+
+      drawLessonCanvasPanel(ctx, rightRect, "World", width);
+      drawRectAxesGrid(ctx, rightRect, 2.6, 2.1, width, 0.6);
+      ctx.strokeStyle = "rgba(255, 223, 132, 0.22)";
+      ctx.lineWidth = Math.max(1.3, width * 0.0022);
+      ctx.beginPath();
+      for (let step = 0; step <= 18; step += 1) {
+        const samplePhase = phase - (18 - step) * 0.12;
+        const sampleCenter = [
+          0.12 + Math.cos(samplePhase * 0.74) * 0.44,
+          -0.04 + Math.sin(samplePhase * 0.66) * 0.34,
+        ];
+        const sampleSocket = add2(sampleCenter, rotate2(socketLocal, samplePhase * 0.86));
+        const projected = project(rightRect, sampleSocket, 2.6, 2.1);
+        if (step === 0) {
+          ctx.moveTo(projected[0], projected[1]);
+        } else {
+          ctx.lineTo(projected[0], projected[1]);
+        }
+      }
+      ctx.stroke();
+      drawShip(rightRect, worldCenter, shipAngle, 2.6, 2.1, "rgba(247, 160, 74, 0.22)", "rgba(247, 160, 74, 0.96)");
+      const socketWorldCanvas = project(rightRect, socketWorld, 2.6, 2.1);
+      drawCanvasDot(
+        ctx,
+        socketWorldCanvas,
+        Math.max(6, width * 0.007),
+        "rgba(115, 221, 213, 0.98)",
+        "rgba(239, 245, 247, 0.94)",
+        Math.max(1.6, width * 0.0023)
+      );
+      drawCanvasChip(ctx, "M*socket", socketWorldCanvas[0] + 18, socketWorldCanvas[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupSpaceWorldUseDemo() {
+  const canvas = document.getElementById("space-world-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.06 : time * 0.8;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 3.7;
+      const extentY = 2.9;
+      const player = [
+        -1.52 + Math.cos(phase * 0.74) * 0.4,
+        -0.56 + Math.sin(phase * 0.86) * 0.28,
+      ];
+      const enemy = [
+        0.98 + Math.sin(phase * 0.58) * 0.62,
+        0.96 + Math.cos(phase * 0.66) * 0.42,
+      ];
+      const delta = subtract2(enemy, player);
+      const distance = Math.hypot(delta[0], delta[1]);
+      const inRange = distance < 2.4;
+      const color = inRange ? "rgba(115, 221, 213, 0.98)" : "rgba(247, 160, 74, 0.98)";
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(point) {
+        return projectRectPoint(rect, point, extentX, extentY, 16, 20, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, rect, "Shared scene", width);
+      drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+
+      const playerCanvas = project(player);
+      const enemyCanvas = project(enemy);
+      const rangeEdge = project(add2(player, [2.4, 0]));
+      ctx.strokeStyle = "rgba(255, 223, 132, 0.24)";
+      ctx.lineWidth = Math.max(1.3, width * 0.0023);
+      ctx.beginPath();
+      ctx.arc(playerCanvas[0], playerCanvas[1], Math.abs(rangeEdge[0] - playerCanvas[0]), 0, TAU);
+      ctx.stroke();
+
+      drawArrow2d(ctx, playerCanvas, enemyCanvas, color, Math.max(2.2, width * 0.003));
+      drawCanvasDot(ctx, playerCanvas, Math.max(8, width * 0.0092), "rgba(247, 160, 74, 0.96)");
+      drawCanvasDot(ctx, enemyCanvas, Math.max(8, width * 0.0092), "rgba(159, 215, 255, 0.96)");
+      drawCanvasChip(ctx, `d ${formatNumber(distance, 2)}`, (playerCanvas[0] + enemyCanvas[0]) * 0.5, (playerCanvas[1] + enemyCanvas[1]) * 0.5 - 14, {
+        fontSize,
+        color,
+      });
+    },
+  });
+}
+
+function setupSpaceViewUseDemo() {
+  const canvas = document.getElementById("space-view-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.12 : time * 0.82;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const camera = [
+        0.34 + Math.cos(phase * 0.58) * 0.46,
+        -0.24 + Math.sin(phase * 0.74) * 0.24,
+      ];
+      const cameraAngle = 0.28 + Math.sin(phase * 0.66) * 0.54;
+      const targetWorld = [
+        1.92 + Math.cos(phase * 0.42) * 0.34,
+        0.78 + Math.sin(phase * 0.54) * 0.28,
+      ];
+      const targetView = rotate2(subtract2(targetWorld, camera), -cameraAngle);
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(rect, point, extentX, extentY) {
+        return projectRectPoint(rect, point, extentX, extentY, 14, 18, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      drawLessonCanvasPanel(ctx, leftRect, "World", width);
+      drawRectAxesGrid(ctx, leftRect, 3.2, 2.4, width, 0.6);
+      const cameraWorldCanvas = project(leftRect, camera, 3.2, 2.4);
+      const targetWorldCanvas = project(leftRect, targetWorld, 3.2, 2.4);
+      drawCameraGlyph(ctx, cameraWorldCanvas, cameraAngle, Math.max(9, width * 0.011), "rgba(255, 223, 132, 0.9)");
+      drawArrow2d(ctx, cameraWorldCanvas, targetWorldCanvas, "rgba(115, 221, 213, 0.9)", Math.max(2.1, width * 0.0029));
+      drawCanvasDot(ctx, targetWorldCanvas, Math.max(7, width * 0.0082), "rgba(159, 215, 255, 0.96)");
+
+      drawLessonCanvasPanel(ctx, rightRect, "View", width);
+      drawRectAxesGrid(ctx, rightRect, 3.2, 2.4, width, 0.6);
+      const cameraOrigin = project(rightRect, [0, 0], 3.2, 2.4);
+      const targetViewCanvas = project(rightRect, targetView, 3.2, 2.4);
+      drawCameraGlyph(ctx, cameraOrigin, 0, Math.max(9, width * 0.011), "rgba(255, 223, 132, 0.9)");
+      drawArrow2d(ctx, cameraOrigin, targetViewCanvas, "rgba(115, 221, 213, 0.9)", Math.max(2.1, width * 0.0029));
+      drawCanvasDot(ctx, targetViewCanvas, Math.max(7, width * 0.0082), "rgba(159, 215, 255, 0.96)");
+      drawCanvasChip(ctx, "camera at 0", cameraOrigin[0] + 18, cameraOrigin[1] - 16, {
+        fontSize,
+        color: "rgba(255, 223, 132, 0.98)",
+      });
+    },
+  });
+}
+
+function setupSpaceScreenUseDemo() {
+  const canvas = document.getElementById("space-screen-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.08 : time * 0.84;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const ndc = [
+        Math.sin(phase * 0.82) * 0.78,
+        Math.cos(phase * 0.64) * 0.72,
+      ];
+      const cols = 8;
+      const rows = 6;
+      const pixel = [
+        (ndc[0] * 0.5 + 0.5) * cols,
+        (1 - (ndc[1] * 0.5 + 0.5)) * rows,
+      ];
+      const cell = [
+        Math.min(cols - 1, Math.max(0, Math.floor(pixel[0]))),
+        Math.min(rows - 1, Math.max(0, Math.floor(pixel[1]))),
+      ];
+      const fontSize = Math.max(10, width * 0.012);
+
+      function projectNdc(rect, point) {
+        return projectRectPoint(rect, point, 1.15, 1.15, 14, 18, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      drawLessonCanvasPanel(ctx, leftRect, "NDC", width);
+      drawRectAxesGrid(ctx, leftRect, 1.15, 1.15, width, 0.6);
+      const ndcTopLeft = projectNdc(leftRect, [-1, 1]);
+      const ndcBottomRight = projectNdc(leftRect, [1, -1]);
+      ctx.strokeStyle = "rgba(115, 221, 213, 0.9)";
+      ctx.lineWidth = Math.max(1.6, width * 0.0025);
+      ctx.strokeRect(
+        ndcTopLeft[0],
+        ndcTopLeft[1],
+        ndcBottomRight[0] - ndcTopLeft[0],
+        ndcBottomRight[1] - ndcTopLeft[1]
+      );
+      const ndcPoint = projectNdc(leftRect, ndc);
+      drawCanvasDot(ctx, ndcPoint, Math.max(6, width * 0.0072), "rgba(115, 221, 213, 0.98)");
+
+      drawLessonCanvasPanel(ctx, rightRect, "Pixels", width);
+      const plot = { x: rightRect.x + 16, y: rightRect.y + 34, width: rightRect.width - 32, height: rightRect.height - 48 };
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= cols; x += 1) {
+        const px = plot.x + (plot.width / cols) * x;
+        ctx.beginPath();
+        ctx.moveTo(px, plot.y);
+        ctx.lineTo(px, plot.y + plot.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= rows; y += 1) {
+        const py = plot.y + (plot.height / rows) * y;
+        ctx.beginPath();
+        ctx.moveTo(plot.x, py);
+        ctx.lineTo(plot.x + plot.width, py);
+        ctx.stroke();
+      }
+      const cellWidth = plot.width / cols;
+      const cellHeight = plot.height / rows;
+      ctx.fillStyle = "rgba(247, 160, 74, 0.28)";
+      ctx.fillRect(plot.x + cell[0] * cellWidth, plot.y + cell[1] * cellHeight, cellWidth, cellHeight);
+      const pixelPoint = [
+        plot.x + (pixel[0] / cols) * plot.width,
+        plot.y + (pixel[1] / rows) * plot.height,
+      ];
+      drawCanvasDot(ctx, pixelPoint, Math.max(5.2, width * 0.0064), "rgba(247, 160, 74, 0.98)");
+      drawCanvasChip(ctx, "vp", (leftRect.x + leftRect.width + rightRect.x) * 0.5, height * 0.5, {
+        fontSize,
+        color: "rgba(255, 245, 216, 0.98)",
+      });
+    },
+  });
+}
+
 function setupSpaceMapStoryDemo() {
   const canvas = document.getElementById("space-map-canvas");
   const ctx = get2dContext(canvas);
@@ -7045,6 +7389,556 @@ function setupGameVectorsStoryDemo() {
       drawCanvasDot(ctx, playerCanvas, Math.max(9, width * 0.0104), "rgba(247, 160, 74, 0.96)", "rgba(255, 245, 216, 0.98)", Math.max(1.8, width * 0.0026));
       drawCanvasDot(ctx, enemyCanvas, Math.max(10, width * 0.011), "rgba(115, 221, 213, 0.92)", "rgba(214, 248, 245, 0.96)", Math.max(1.8, width * 0.0026));
       drawCanvasDot(ctx, projectileCanvas, Math.max(4.8, width * 0.0062), "rgba(255, 245, 216, 0.98)");
+    },
+  });
+}
+
+function setupDotCrossStoryDemo() {
+  const canvas = document.getElementById("dot-cross-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.06 : time * 0.82;
+      const margin = 18;
+      const gap = 16;
+      const stacked = width < 900;
+      const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap) / 2;
+      const panelHeight = stacked ? (height - margin * 2 - gap) / 2 : height - margin * 2;
+      const dotRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const crossRect = stacked
+        ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
+        : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+
+      const forwardAngle = 0.24 + Math.sin(phase * 0.58) * 0.4;
+      const forward = normalize2([Math.cos(forwardAngle), Math.sin(forwardAngle)]);
+      const targetAngle = phase * 1.08 + 0.46;
+      const targetPoint = [Math.cos(targetAngle) * 1.65, Math.sin(targetAngle) * 1.18];
+      const toTarget = normalize2(targetPoint);
+      const dotValue = clamp(dot2(forward, toTarget), -1, 1);
+      const dotColor =
+        dotValue >= 0 ? "rgba(115, 221, 213, 0.98)" : "rgba(247, 160, 74, 0.98)";
+
+      const pointA = [-1.05, -0.64, -0.24];
+      const pointB = [1.18, -0.22, 0.12 + Math.sin(phase * 0.72) * 0.22];
+      const pointC = [-0.18, 1.02 + Math.cos(phase * 0.66) * 0.14, 0.72 + Math.sin(phase * 0.9) * 0.24];
+      const edge1 = subtract3(pointB, pointA);
+      const edge2 = subtract3(pointC, pointA);
+      let normal = normalize3(cross3(edge1, edge2));
+      const viewDirection = normalize3([0.34, 0.42, 1]);
+      if (dot3(normal, viewDirection) < 0) {
+        normal = scale3(normal, -1);
+      }
+      const centroid = [
+        (pointA[0] + pointB[0] + pointC[0]) / 3,
+        (pointA[1] + pointB[1] + pointC[1]) / 3,
+        (pointA[2] + pointB[2] + pointC[2]) / 3,
+      ];
+      const normalTip = add3(centroid, scale3(normal, 0.94));
+
+      function drawDotPanel(rect) {
+        const extentX = 2.45;
+        const extentY = 2.15;
+        const fontSize = Math.max(10, width * 0.013);
+
+        drawLessonCanvasPanel(ctx, rect, "Dot = alignment", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+
+        const origin = projectRectPoint(rect, [0, 0], extentX, extentY);
+        const forwardTip = projectRectPoint(rect, scale2(forward, 1.35), extentX, extentY);
+        const targetCanvas = projectRectPoint(rect, targetPoint, extentX, extentY);
+        const directionTip = projectRectPoint(rect, scale2(toTarget, 1.5), extentX, extentY);
+        const orbitRadiusX = (1.65 / extentX) * (rect.width * 0.5 - 16);
+        const orbitRadiusY = (1.18 / extentY) * (rect.height * 0.5 - 18);
+        const spread = 0.62;
+        const coneLength = 1.48;
+
+        ctx.fillStyle = "rgba(255, 223, 132, 0.08)";
+        ctx.beginPath();
+        ctx.moveTo(origin[0], origin[1]);
+        for (let step = 0; step <= 16; step += 1) {
+          const offset = lerp(-spread, spread, step / 16);
+          const ray = rotate2(forward, offset);
+          const conePoint = projectRectPoint(rect, scale2(ray, coneLength), extentX, extentY);
+          ctx.lineTo(conePoint[0], conePoint[1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.setLineDash([8, 8]);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+        ctx.lineWidth = Math.max(1.2, width * 0.0022);
+        ctx.beginPath();
+        ctx.ellipse(origin[0], origin[1], orbitRadiusX, orbitRadiusY, 0, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.setLineDash([8, 6]);
+        drawArrow2d(ctx, origin, targetCanvas, "rgba(255, 223, 132, 0.72)", Math.max(1.8, width * 0.0028));
+        ctx.setLineDash([]);
+        drawArrow2d(ctx, origin, forwardTip, "rgba(247, 160, 74, 0.96)", Math.max(2.4, width * 0.0032));
+        drawArrow2d(ctx, origin, directionTip, "rgba(115, 221, 213, 0.96)", Math.max(2.3, width * 0.0032));
+
+        drawCameraGlyph(
+          ctx,
+          origin,
+          forwardAngle,
+          Math.max(10, width * 0.0112),
+          "rgba(247, 160, 74, 0.96)",
+          "rgba(255, 245, 216, 0.96)"
+        );
+        drawCanvasDot(
+          ctx,
+          targetCanvas,
+          Math.max(8, width * 0.0094),
+          dotColor,
+          "rgba(239, 245, 247, 0.95)",
+          Math.max(1.6, width * 0.0024)
+        );
+
+        drawCanvasChip(ctx, "f", forwardTip[0] + 14, forwardTip[1] - 14, {
+          fontSize,
+          color: "rgba(247, 160, 74, 0.98)",
+        });
+        drawCanvasChip(ctx, "to", directionTip[0] + 14, directionTip[1] - 14, {
+          fontSize,
+          color: "rgba(115, 221, 213, 0.98)",
+        });
+        drawCanvasChip(ctx, `dot ${formatNumber(dotValue, 2)}`, rect.x + rect.width - 12, rect.y + 16, {
+          align: "right",
+          fontSize,
+          color: dotColor,
+        });
+
+        const meterX = rect.x + 18;
+        const meterY = rect.y + rect.height - 24;
+        const meterWidth = rect.width - 36;
+        const meterHeight = 8;
+        const markerX = meterX + ((dotValue + 1) * 0.5) * meterWidth;
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+        ctx.fillRect(meterX, meterY, meterWidth, meterHeight);
+        ctx.fillStyle = dotColor;
+        ctx.fillRect(markerX - 4, meterY - 3, 8, meterHeight + 6);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.24)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(meterX + meterWidth * 0.5, meterY - 5);
+        ctx.lineTo(meterX + meterWidth * 0.5, meterY + meterHeight + 5);
+        ctx.stroke();
+      }
+
+      function drawCrossPanel(rect) {
+        const extentX = 2.75;
+        const extentY = 2.2;
+        const fontSize = Math.max(10, width * 0.013);
+
+        function project3(point) {
+          const flattened = [
+            point[0] * 0.92 - point[2] * 0.56,
+            point[1] * 0.9 + point[0] * 0.16 + point[2] * 0.26,
+          ];
+          return projectRectPoint(rect, flattened, extentX, extentY, 16, 20, 0.58);
+        }
+
+        drawLessonCanvasPanel(ctx, rect, "Cross = normal", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+
+        const aCanvas = project3(pointA);
+        const bCanvas = project3(pointB);
+        const cCanvas = project3(pointC);
+        const centerCanvas = project3(centroid);
+        const normalCanvas = project3(normalTip);
+        const edge1Mid = [(aCanvas[0] + bCanvas[0]) * 0.5, (aCanvas[1] + bCanvas[1]) * 0.5];
+        const edge2Mid = [(aCanvas[0] + cCanvas[0]) * 0.5, (aCanvas[1] + cCanvas[1]) * 0.5];
+
+        ctx.fillStyle = "rgba(115, 221, 213, 0.18)";
+        ctx.strokeStyle = "rgba(214, 248, 245, 0.92)";
+        ctx.lineWidth = Math.max(2, width * 0.003);
+        ctx.beginPath();
+        ctx.moveTo(aCanvas[0], aCanvas[1]);
+        ctx.lineTo(bCanvas[0], bCanvas[1]);
+        ctx.lineTo(cCanvas[0], cCanvas[1]);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        drawArrow2d(ctx, aCanvas, bCanvas, "rgba(247, 160, 74, 0.96)", Math.max(2.2, width * 0.003));
+        drawArrow2d(ctx, aCanvas, cCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2.2, width * 0.003));
+        drawArrow2d(ctx, centerCanvas, normalCanvas, "rgba(255, 245, 216, 0.96)", Math.max(2.3, width * 0.0032));
+
+        drawCanvasDot(ctx, aCanvas, Math.max(5.2, width * 0.0065), "rgba(247, 160, 74, 0.96)");
+        drawCanvasDot(ctx, bCanvas, Math.max(5.2, width * 0.0065), "rgba(247, 160, 74, 0.82)");
+        drawCanvasDot(ctx, cCanvas, Math.max(5.2, width * 0.0065), "rgba(115, 221, 213, 0.9)");
+
+        drawCanvasChip(ctx, "e1", edge1Mid[0], edge1Mid[1] - 16, {
+          fontSize,
+          color: "rgba(247, 160, 74, 0.98)",
+        });
+        drawCanvasChip(ctx, "e2", edge2Mid[0], edge2Mid[1] - 16, {
+          fontSize,
+          color: "rgba(115, 221, 213, 0.98)",
+        });
+        drawCanvasChip(ctx, "n", normalCanvas[0] + 12, normalCanvas[1] - 14, {
+          fontSize,
+          color: "rgba(255, 245, 216, 0.98)",
+        });
+        drawCanvasChip(ctx, "e1 x e2", rect.x + rect.width - 12, rect.y + 16, {
+          align: "right",
+          fontSize,
+          color: "rgba(255, 245, 216, 0.98)",
+        });
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawDotPanel(dotRect);
+      drawCrossPanel(crossRect);
+    },
+  });
+}
+
+function setupVectorOffsetUseDemo() {
+  const canvas = document.getElementById("vector-offset-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.08 : time * 0.84;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 3.7;
+      const extentY = 2.8;
+      const player = [
+        -1.72 + Math.cos(phase * 0.92) * 0.42,
+        -0.86 + Math.sin(phase * 0.78) * 0.28,
+      ];
+      const pickup = [
+        1.12 + Math.sin(phase * 0.44) * 0.22,
+        0.72 + Math.cos(phase * 0.58) * 0.18,
+      ];
+      const offset = subtract2(pickup, player);
+      const reusedStart = [-1.32, 1.02];
+      const reusedEnd = add2(reusedStart, offset);
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(point) {
+        return projectRectPoint(rect, point, extentX, extentY, 16, 20, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, rect, "Offset reuse", width);
+      drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+
+      const playerCanvas = project(player);
+      const pickupCanvas = project(pickup);
+      const reusedStartCanvas = project(reusedStart);
+      const reusedEndCanvas = project(reusedEnd);
+
+      ctx.setLineDash([8, 6]);
+      drawArrow2d(ctx, playerCanvas, pickupCanvas, "rgba(247, 160, 74, 0.94)", Math.max(2.1, width * 0.003));
+      ctx.setLineDash([]);
+      drawArrow2d(ctx, reusedStartCanvas, reusedEndCanvas, "rgba(115, 221, 213, 0.94)", Math.max(2.1, width * 0.003));
+
+      drawCanvasDot(ctx, playerCanvas, Math.max(7.5, width * 0.009), "rgba(247, 160, 74, 0.96)");
+      drawCanvasDot(ctx, pickupCanvas, Math.max(7.5, width * 0.009), "rgba(115, 221, 213, 0.96)");
+      drawCanvasDot(ctx, reusedStartCanvas, Math.max(4.6, width * 0.006), "rgba(247, 160, 74, 0.76)");
+      drawCanvasDot(ctx, reusedEndCanvas, Math.max(4.6, width * 0.006), "rgba(115, 221, 213, 0.76)");
+
+      drawCanvasChip(ctx, "to", (playerCanvas[0] + pickupCanvas[0]) * 0.5, (playerCanvas[1] + pickupCanvas[1]) * 0.5 - 14, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "same offset", (reusedStartCanvas[0] + reusedEndCanvas[0]) * 0.5, (reusedStartCanvas[1] + reusedEndCanvas[1]) * 0.5 - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupVectorNormalizeUseDemo() {
+  const canvas = document.getElementById("vector-normalize-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.14 : time * 0.86;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const direction = normalize2([1, 0.28 + Math.sin(phase * 0.94) * 0.36]);
+      const rawLength = 0.48 + (0.5 + Math.sin(phase * 1.16) * 0.5) * 1.2;
+      const raw = scale2(direction, rawLength);
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(rect, point) {
+        return projectRectPoint(rect, point, 2.15, 2.15, 14, 20, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, leftRect, "Raw", width);
+      drawLessonCanvasPanel(ctx, rightRect, "Unit", width);
+      drawRectAxesGrid(ctx, leftRect, 2.15, 2.15, width, 0.6);
+      drawRectAxesGrid(ctx, rightRect, 2.15, 2.15, width, 0.6);
+
+      const rawOrigin = project(leftRect, [0, 0]);
+      const rawTip = project(leftRect, raw);
+      drawArrow2d(ctx, rawOrigin, rawTip, "rgba(247, 160, 74, 0.96)", Math.max(2.3, width * 0.0031));
+      drawCanvasDot(ctx, rawTip, Math.max(5.5, width * 0.0065), "rgba(247, 160, 74, 0.96)");
+      drawCanvasChip(ctx, "v", rawTip[0] + 14, rawTip[1] - 14, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+
+      const unitOrigin = project(rightRect, [0, 0]);
+      const circleEdge = project(rightRect, [1, 0]);
+      const unitRadius = Math.abs(circleEdge[0] - unitOrigin[0]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0024);
+      ctx.beginPath();
+      ctx.arc(unitOrigin[0], unitOrigin[1], unitRadius, 0, TAU);
+      ctx.stroke();
+      const unitTip = project(rightRect, direction);
+      drawArrow2d(ctx, unitOrigin, unitTip, "rgba(115, 221, 213, 0.96)", Math.max(2.3, width * 0.0031));
+      drawCanvasDot(ctx, unitTip, Math.max(5.5, width * 0.0065), "rgba(115, 221, 213, 0.96)");
+      drawCanvasChip(ctx, "norm(v)", unitTip[0] + 18, unitTip[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupVectorDotUseDemo() {
+  const canvas = document.getElementById("vector-dot-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.04 : time * 0.82;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 2.55;
+      const extentY = 2.15;
+      const forwardAngle = 0.22 + Math.sin(phase * 0.62) * 0.42;
+      const forward = normalize2([Math.cos(forwardAngle), Math.sin(forwardAngle)]);
+      const targetAngle = phase * 1.08 + 0.48;
+      const target = [Math.cos(targetAngle) * 1.6, Math.sin(targetAngle) * 1.2];
+      const toTarget = normalize2(target);
+      const dotValue = clamp(dot2(forward, toTarget), -1, 1);
+      const color = dotValue >= 0 ? "rgba(115, 221, 213, 0.98)" : "rgba(247, 160, 74, 0.98)";
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project(point) {
+        return projectRectPoint(rect, point, extentX, extentY, 16, 18, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, rect, "Front test", width);
+      drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+
+      const origin = project([0, 0]);
+      const forwardTip = project(scale2(forward, 1.3));
+      const targetTip = project(scale2(toTarget, 1.45));
+      const targetCanvas = project(target);
+      const coneSpread = 0.58;
+
+      ctx.fillStyle = "rgba(255, 223, 132, 0.08)";
+      ctx.beginPath();
+      ctx.moveTo(origin[0], origin[1]);
+      for (let step = 0; step <= 14; step += 1) {
+        const ray = rotate2(forward, lerp(-coneSpread, coneSpread, step / 14));
+        const point = project(scale2(ray, 1.5));
+        ctx.lineTo(point[0], point[1]);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      drawCameraGlyph(ctx, origin, forwardAngle, Math.max(10, width * 0.011), "rgba(247, 160, 74, 0.96)", "rgba(255, 245, 216, 0.96)");
+      drawArrow2d(ctx, origin, forwardTip, "rgba(247, 160, 74, 0.96)", Math.max(2.3, width * 0.003));
+      ctx.setLineDash([8, 6]);
+      drawArrow2d(ctx, origin, targetCanvas, "rgba(255, 223, 132, 0.76)", Math.max(1.7, width * 0.0026));
+      ctx.setLineDash([]);
+      drawArrow2d(ctx, origin, targetTip, "rgba(115, 221, 213, 0.96)", Math.max(2.2, width * 0.003));
+      drawCanvasDot(ctx, targetCanvas, Math.max(7.2, width * 0.0086), color, "rgba(239, 245, 247, 0.95)", Math.max(1.6, width * 0.0023));
+
+      drawCanvasChip(ctx, "f", forwardTip[0] + 14, forwardTip[1] - 14, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "to", targetTip[0] + 14, targetTip[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+      drawCanvasChip(ctx, `dot ${formatNumber(dotValue, 2)}`, rect.x + rect.width - 12, rect.y + 16, {
+        align: "right",
+        fontSize,
+        color,
+      });
+
+      const meterX = rect.x + 18;
+      const meterY = rect.y + rect.height - 22;
+      const meterWidth = rect.width - 36;
+      const meterHeight = 8;
+      const markerX = meterX + ((dotValue + 1) * 0.5) * meterWidth;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.fillRect(meterX, meterY, meterWidth, meterHeight);
+      ctx.fillStyle = color;
+      ctx.fillRect(markerX - 4, meterY - 3, 8, meterHeight + 6);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(meterX + meterWidth * 0.5, meterY - 5);
+      ctx.lineTo(meterX + meterWidth * 0.5, meterY + meterHeight + 5);
+      ctx.stroke();
+    },
+  });
+}
+
+function setupVectorCrossUseDemo() {
+  const canvas = document.getElementById("vector-cross-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.1 : time * 0.78;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 2.8;
+      const extentY = 2.25;
+      const pointA = [-1.05, -0.62, -0.2];
+      const pointB = [1.18, -0.18, 0.08 + Math.sin(phase * 0.72) * 0.22];
+      const pointC = [-0.16, 0.98 + Math.cos(phase * 0.66) * 0.14, 0.72 + Math.sin(phase * 0.86) * 0.24];
+      const edge1 = subtract3(pointB, pointA);
+      const edge2 = subtract3(pointC, pointA);
+      let normal = normalize3(cross3(edge1, edge2));
+      if (dot3(normal, normalize3([0.24, 0.4, 1])) < 0) {
+        normal = scale3(normal, -1);
+      }
+      const center = [
+        (pointA[0] + pointB[0] + pointC[0]) / 3,
+        (pointA[1] + pointB[1] + pointC[1]) / 3,
+        (pointA[2] + pointB[2] + pointC[2]) / 3,
+      ];
+      const normalTip = add3(center, scale3(normal, 0.9));
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project3(point) {
+        return projectRectPoint(
+          rect,
+          [point[0] * 0.92 - point[2] * 0.56, point[1] * 0.88 + point[0] * 0.18 + point[2] * 0.28],
+          extentX,
+          extentY,
+          16,
+          20,
+          0.6
+        );
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, rect, "Triangle normal", width);
+      drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+
+      const aCanvas = project3(pointA);
+      const bCanvas = project3(pointB);
+      const cCanvas = project3(pointC);
+      const centerCanvas = project3(center);
+      const normalCanvas = project3(normalTip);
+      const edge1Mid = [(aCanvas[0] + bCanvas[0]) * 0.5, (aCanvas[1] + bCanvas[1]) * 0.5];
+      const edge2Mid = [(aCanvas[0] + cCanvas[0]) * 0.5, (aCanvas[1] + cCanvas[1]) * 0.5];
+
+      ctx.fillStyle = "rgba(115, 221, 213, 0.18)";
+      ctx.strokeStyle = "rgba(214, 248, 245, 0.92)";
+      ctx.lineWidth = Math.max(1.9, width * 0.0028);
+      ctx.beginPath();
+      ctx.moveTo(aCanvas[0], aCanvas[1]);
+      ctx.lineTo(bCanvas[0], bCanvas[1]);
+      ctx.lineTo(cCanvas[0], cCanvas[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      drawArrow2d(ctx, aCanvas, bCanvas, "rgba(247, 160, 74, 0.96)", Math.max(2.1, width * 0.003));
+      drawArrow2d(ctx, aCanvas, cCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2.1, width * 0.003));
+      drawArrow2d(ctx, centerCanvas, normalCanvas, "rgba(255, 245, 216, 0.96)", Math.max(2.2, width * 0.0031));
+
+      drawCanvasChip(ctx, "e1", edge1Mid[0], edge1Mid[1] - 14, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "e2", edge2Mid[0], edge2Mid[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+      drawCanvasChip(ctx, "n", normalCanvas[0] + 12, normalCanvas[1] - 14, {
+        fontSize,
+        color: "rgba(255, 245, 216, 0.98)",
+      });
     },
   });
 }
@@ -13122,6 +14016,11 @@ function initialize() {
   safeSetup("hero-canvas", setupHeroDemo);
   safeSetup("foundation-types-canvas", setupFoundationTypesDemo);
   safeSetup("game-vectors-canvas", setupGameVectorsStoryDemo);
+  safeSetup("dot-cross-canvas", setupDotCrossStoryDemo);
+  safeSetup("vector-offset-use-canvas", setupVectorOffsetUseDemo);
+  safeSetup("vector-normalize-use-canvas", setupVectorNormalizeUseDemo);
+  safeSetup("vector-dot-use-canvas", setupVectorDotUseDemo);
+  safeSetup("vector-cross-use-canvas", setupVectorCrossUseDemo);
   safeSetup("matrix-columns-canvas", setupMatrixColumnsDemo);
   safeSetup("affine-story-canvas", setupAffineStoryDemo);
   safeSetup("basis-story-canvas", setupBasisStoryDemo);
@@ -13133,6 +14032,10 @@ function initialize() {
   safeSetup("space-clip-canvas", setupSpaceClipDemo);
   safeSetup("space-contract-canvas", setupSpaceContractDemo);
   safeSetup("game-spaces-canvas", setupGameSpacesStoryDemo);
+  safeSetup("space-attachment-use-canvas", setupSpaceAttachmentUseDemo);
+  safeSetup("space-world-use-canvas", setupSpaceWorldUseDemo);
+  safeSetup("space-view-use-canvas", setupSpaceViewUseDemo);
+  safeSetup("space-screen-use-canvas", setupSpaceScreenUseDemo);
   safeSetup("camera-frame-canvas", setupCameraFrameStoryDemo);
   safeSetup("worked-example-canvas", setupWorkedExampleStoryDemo);
   safeSetup("space-map-canvas", setupSpaceMapStoryDemo);

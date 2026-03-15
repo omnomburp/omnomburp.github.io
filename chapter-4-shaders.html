@@ -50,6 +50,7 @@
             <a href="#stage-split">Stage split</a>
             <a href="#shader-uses">More uses</a>
             <a href="#data-path">Data path</a>
+            <a href="#mesh-data">Mesh data</a>
             <a href="#lab">Live lab</a>
             <a href="#gpu-simulation">GPU simulation</a>
             <a href="#varyings">Interpolation probe</a>
@@ -302,6 +303,65 @@ fragment shader
                   <p>In modern GL-style APIs, a vertex array object is the saved recipe for how those buffers map into attributes.</p>
                 </article>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mesh-data">
+          <div class="section-header">
+            <p class="eyebrow">Mesh data</p>
+            <h2>How triangles are stored, shared, and oriented before the GPU sees them</h2>
+            <p>
+              Before shaders run, the geometry itself needs to be well-formed. Three decisions shape every mesh:
+              how vertices are stored, how triangles reuse them, and which direction each face points.
+              Getting these wrong causes invisible geometry, wasted memory, or lighting that breaks silently.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="mesh-data-canvas" class="canvas-stage canvas-stage-wide" aria-label="Mesh data structures explainer"></canvas>
+            <p class="canvas-caption">Four panels cover the building blocks of mesh storage: winding order, face culling, vertex sharing via index buffers, and edge adjacency.</p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>Winding order</h3>
+              <p>The order you list a triangle's vertices — clockwise or counter-clockwise — defines which side is the front. This single convention drives face culling and normal direction.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Face culling</h3>
+              <p>The GPU can skip triangles that face away from the camera. Back-face culling halves the fragment work for closed objects, but only works when winding is consistent.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Shared vertices</h3>
+              <p>A naive mesh lists every triangle's three vertices independently. An index buffer lets triangles reference shared vertices, cutting memory and keeping attributes consistent at shared edges.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Edge adjacency</h3>
+              <p>Two triangles that share an edge share two vertex indices. Knowing which triangles are neighbors lets the engine compute smooth normals, detect silhouette edges, and build shadow volumes.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// Naive: 2 triangles = 6 vertices
+positions = [A, B, C,  C, B, D]
+
+// Indexed: 4 vertices + 6 indices
+positions = [A, B, C, D]
+indices   = [0, 1, 2,  2, 1, 3]
+
+// winding: CCW = front-facing
+// A → B → C is counter-clockwise
+// swap any two → clockwise → back face</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why winding is a convention</h3>
+                <p>OpenGL defaults to counter-clockwise as front-facing. DirectX historically used clockwise. The choice is arbitrary, but it must be consistent across the entire mesh or culling will punch holes.</p>
+              </article>
+              <article class="mini-card">
+                <h3>When to duplicate vertices on purpose</h3>
+                <p>Hard edges, UV seams, and material boundaries all require different attributes at the same position. In those cases, duplicating the vertex is correct — the "shared" vertex is actually two different surface points that happen to overlap.</p>
+              </article>
             </div>
           </div>
         </section>

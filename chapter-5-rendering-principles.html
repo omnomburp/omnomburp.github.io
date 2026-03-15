@@ -51,6 +51,8 @@
             <a href="#triangle-story">Triangle story</a>
             <a href="#visibility-story">Visibility story</a>
             <a href="#frame">Frame walkthrough</a>
+            <a href="#framebuffers">Framebuffers</a>
+            <a href="#multi-pass">Multi-pass rendering</a>
             <a href="#lab">Live lab</a>
             <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
@@ -342,6 +344,122 @@
               <article class="mini-card">
                 <h3>Transparency is a separate visibility problem</h3>
                 <p>Alpha-blended surfaces often need sorted draw order because the depth buffer alone cannot combine partially transparent layers correctly.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="framebuffers">
+          <div class="section-header">
+            <p class="eyebrow">Framebuffers</p>
+            <h2>A framebuffer is a render target that does not have to be the screen</h2>
+            <p>
+              So far, every draw call writes to the default framebuffer — the image that appears on your monitor.
+              But the GPU can draw into a texture-backed framebuffer object (FBO) instead. That texture
+              can then be sampled in a later pass, which is the foundation of shadow maps, post-processing,
+              reflections, and deferred shading.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="framebuffer-concept-canvas" class="canvas-stage canvas-stage-wide" aria-label="Framebuffer concept diagram"></canvas>
+            <p class="canvas-caption">Pass 1 renders the scene into an off-screen texture. Pass 2 reads that texture and draws a full-screen quad to the screen. The texture bridges the two passes.</p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>The default framebuffer is the screen</h3>
+              <p>Every draw call you have seen so far writes directly to the display. The GPU picks the default framebuffer when no FBO is bound.</p>
+            </article>
+            <article class="mini-card">
+              <h3>An FBO redirects rendering to a texture</h3>
+              <p>Create a framebuffer object, attach a texture as the color target, and bind it before drawing. The scene renders into the texture instead of the screen.</p>
+            </article>
+            <article class="mini-card">
+              <h3>The texture becomes a readable result</h3>
+              <p>Once the off-screen pass is done, you unbind the FBO and bind the texture as a regular sampler input. Later shaders can read the result as if it were any other texture.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Depth attachments work the same way</h3>
+              <p>Shadow maps store depth values in an FBO's depth attachment. The shadow pass writes depth from the light's viewpoint; the scene pass reads it to decide which fragments are in shadow.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// pass 1: render scene into FBO
+bindFramebuffer(fbo);
+drawScene();
+
+// pass 2: use the result as a texture
+bindFramebuffer(null);   // back to screen
+bindTexture(fbo.colorAttachment);
+drawFullscreenQuad();</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Resolution is independent</h3>
+                <p>The off-screen texture can be any size. Shadow maps are often 1024×1024 or 2048×2048 regardless of screen resolution. Post-processing can render at half resolution for speed.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Multiple attachments</h3>
+                <p>A single FBO can have multiple color attachments. Deferred shading uses this to write position, normal, and albedo into separate textures in one pass.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="multi-pass">
+          <div class="section-header">
+            <p class="eyebrow">Multi-pass rendering</p>
+            <h2>Complex effects are built by chaining render passes</h2>
+            <p>
+              A single frame in a modern engine often involves several render passes, each targeting a different
+              framebuffer. One pass captures shadow depth, another draws the lit scene, another applies bloom or blur,
+              and a final composite pass assembles the result for the screen. Each pass reads textures produced by
+              earlier passes.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="multipass-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Multi-pass rendering pipeline"></canvas>
+            <p class="canvas-caption">A typical frame: shadow pass writes depth from the light, scene pass reads it for shadows, post-processing blurs bright areas, and the final pass composites everything to the screen.</p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>Shadow pass</h3>
+              <p>Render the scene from the light's viewpoint into a depth-only FBO. The result is a shadow map — a texture of depth values that the scene pass uses to test visibility from the light.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Scene pass</h3>
+              <p>Render the scene from the camera's viewpoint into an off-screen color FBO. The shader samples the shadow map to darken occluded fragments. The result is an HDR color texture.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Post-processing pass</h3>
+              <p>A full-screen quad shader reads the scene texture, extracts bright areas, and blurs them to create bloom. Other effects — tone mapping, color grading, anti-aliasing — happen here too.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Final composite</h3>
+              <p>The last pass writes to the default framebuffer (the screen). It combines the post-processed result with any UI overlays and applies the display transfer function.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// frame structure
+pass 1: shadow depth  → FBO_shadow
+pass 2: lit scene     → FBO_scene
+        (reads FBO_shadow)
+pass 3: bloom blur    → FBO_bloom
+        (reads FBO_scene)
+pass 4: composite     → screen
+        (reads FBO_scene + FBO_bloom)</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Deferred shading</h3>
+                <p>Instead of lighting every fragment during the scene pass, deferred shading writes geometry data (position, normal, albedo) into a G-buffer with multiple FBO attachments. A later full-screen pass lights each pixel using the G-buffer. This decouples geometry from lighting and handles many lights efficiently.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Cost of passes</h3>
+                <p>Each pass has overhead: switching FBOs, clearing buffers, and issuing draw calls. Engines minimize passes by combining work when possible, but the flexibility of multi-pass rendering usually outweighs the cost.</p>
               </article>
             </div>
           </div>

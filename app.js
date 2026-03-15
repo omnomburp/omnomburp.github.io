@@ -141,6 +141,20 @@ const shaderProbeControls = {
   bands: document.getElementById("shader-probe-bands"),
 };
 
+const determinantControls = {
+  col1Angle: document.getElementById("det-col1-angle"),
+  col1Len: document.getElementById("det-col1-len"),
+  col2Angle: document.getElementById("det-col2-angle"),
+  col2Len: document.getElementById("det-col2-len"),
+};
+
+const tbnControls = {
+  tilt: document.getElementById("tbn-tilt"),
+  light: document.getElementById("tbn-light"),
+  useMap: document.getElementById("tbn-use-map"),
+  showAxes: document.getElementById("tbn-show-axes"),
+};
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -5539,6 +5553,228 @@ function setupShaderDataflowDemo() {
   });
 }
 
+function setupMeshDataDemo() {
+  const canvas = document.getElementById("mesh-data-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const phase = prefersReducedMotion ? 0 : time;
+      const margin = 18;
+      const gap = 16;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = (height - margin * 2 - gap) / 2;
+      const panels = [
+        { x: margin, y: margin, width: panelWidth, height: panelHeight },
+        { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight },
+        { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight },
+        { x: margin + panelWidth + gap, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight },
+      ];
+
+      function drawVertex(x, y, label, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        if (label) {
+          ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
+          ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+          ctx.fillText(label, x + 8, y - 6);
+        }
+      }
+
+      function drawTri(pts, fill, stroke) {
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.lineTo(pts[1][0], pts[1][1]);
+        ctx.lineTo(pts[2][0], pts[2][1]);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawWindingArrows(pts, color) {
+        for (let i = 0; i < 3; i++) {
+          const from = pts[i];
+          const to = pts[(i + 1) % 3];
+          const mx = (from[0] + to[0]) * 0.5;
+          const my = (from[1] + to[1]) * 0.5;
+          const dx = to[0] - from[0];
+          const dy = to[1] - from[1];
+          const len = Math.hypot(dx, dy) || 1;
+          const frac = Math.min(18, len * 0.3);
+          drawArrow2d(ctx, [mx - dx / len * frac * 0.5, my - dy / len * frac * 0.5], [mx + dx / len * frac * 0.5, my + dy / len * frac * 0.5], color, 1.8);
+        }
+      }
+
+      // Panel 1: Winding order
+      (function (rect) {
+        drawLessonCanvasPanel(ctx, rect, "1. Winding order", width);
+        const cx = rect.x + rect.width * 0.5;
+        const cy = rect.y + rect.height * 0.52;
+        const r = Math.min(rect.width, rect.height) * 0.28;
+
+        const ccwPts = [
+          [cx - r * 1.1, cy + r * 0.7],
+          [cx - r * 0.1, cy - r * 0.8],
+          [cx + r * 0.7, cy + r * 0.7],
+        ];
+        drawTri(ccwPts, "rgba(115, 221, 213, 0.18)", "rgba(115, 221, 213, 0.8)");
+        drawWindingArrows(ccwPts, "rgba(115, 221, 213, 0.7)");
+
+        drawVertex(ccwPts[0][0], ccwPts[0][1], "A", "rgba(115, 221, 213, 0.9)");
+        drawVertex(ccwPts[1][0], ccwPts[1][1], "B", "rgba(115, 221, 213, 0.9)");
+        drawVertex(ccwPts[2][0], ccwPts[2][1], "C", "rgba(115, 221, 213, 0.9)");
+
+        const ncx = (ccwPts[0][0] + ccwPts[1][0] + ccwPts[2][0]) / 3;
+        const ncy = (ccwPts[0][1] + ccwPts[1][1] + ccwPts[2][1]) / 3;
+        ctx.fillStyle = "rgba(239, 245, 247, 0.7)";
+        ctx.beginPath();
+        ctx.arc(ncx, ncy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(239, 245, 247, 0.5)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(ncx, ncy, 9, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
+        ctx.font = `${Math.max(10, width * 0.0108)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["CCW = front-facing", "Normal points toward you (\u2299)"], rect.x + 14, rect.y + rect.height - 38, 15);
+      })(panels[0]);
+
+      // Panel 2: Face culling
+      (function (rect) {
+        drawLessonCanvasPanel(ctx, rect, "2. Face culling", width);
+        const cx = rect.x + rect.width * 0.5;
+        const cy = rect.y + rect.height * 0.5;
+        const r = Math.min(rect.width, rect.height) * 0.22;
+
+        const leftPts = [
+          [cx - r * 1.4, cy + r * 0.7],
+          [cx - r * 0.5, cy - r * 0.7],
+          [cx + r * 0.1, cy + r * 0.6],
+        ];
+        drawTri(leftPts, "rgba(115, 221, 213, 0.2)", "rgba(115, 221, 213, 0.8)");
+        drawCanvasChip(ctx, "front \u2192 keep", cx - r * 0.7, cy + r * 1.2, { fontSize: Math.max(9, width * 0.01), background: "rgba(115, 221, 213, 0.15)", border: "rgba(115, 221, 213, 0.4)", color: "rgba(115, 221, 213, 0.9)" });
+
+        const rightPts = [
+          [cx + r * 0.4, cy + r * 0.7],
+          [cx + r * 1.5, cy + r * 0.6],
+          [cx + r * 0.9, cy - r * 0.7],
+        ];
+        drawTri(rightPts, "rgba(247, 160, 74, 0.12)", "rgba(247, 160, 74, 0.35)");
+
+        const rxc = (rightPts[0][0] + rightPts[1][0] + rightPts[2][0]) / 3;
+        const ryc = (rightPts[0][1] + rightPts[1][1] + rightPts[2][1]) / 3;
+        ctx.strokeStyle = "rgba(247, 160, 74, 0.6)";
+        ctx.lineWidth = 2.5;
+        const xr = 12;
+        ctx.beginPath();
+        ctx.moveTo(rxc - xr, ryc - xr);
+        ctx.lineTo(rxc + xr, ryc + xr);
+        ctx.moveTo(rxc + xr, ryc - xr);
+        ctx.lineTo(rxc - xr, ryc + xr);
+        ctx.stroke();
+
+        drawCanvasChip(ctx, "back \u2192 culled", cx + r * 0.9, cy + r * 1.2, { fontSize: Math.max(9, width * 0.01), background: "rgba(247, 160, 74, 0.12)", border: "rgba(247, 160, 74, 0.35)", color: "rgba(247, 160, 74, 0.8)" });
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
+        ctx.font = `${Math.max(10, width * 0.0108)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["Back-face culling skips ~half the triangles", "for closed objects. Saves fragment work."], rect.x + 14, rect.y + rect.height - 38, 15);
+      })(panels[1]);
+
+      // Panel 3: Shared vertices
+      (function (rect) {
+        drawLessonCanvasPanel(ctx, rect, "3. Shared vertices (index buffer)", width);
+        const cx = rect.x + rect.width * 0.5;
+        const cy = rect.y + rect.height * 0.48;
+        const r = Math.min(rect.width, rect.height) * 0.24;
+
+        const A = [cx - r, cy + r * 0.6];
+        const B = [cx + r, cy + r * 0.6];
+        const C = [cx - r, cy - r * 0.6];
+        const D = [cx + r, cy - r * 0.6];
+
+        drawTri([A, B, C], "rgba(115, 221, 213, 0.12)", "rgba(115, 221, 213, 0.5)");
+        drawTri([C, B, D], "rgba(247, 200, 74, 0.12)", "rgba(247, 200, 74, 0.5)");
+
+        ctx.strokeStyle = "rgba(239, 245, 247, 0.7)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(B[0], B[1]);
+        ctx.lineTo(C[0], C[1]);
+        ctx.stroke();
+
+        drawVertex(A[0], A[1], "0", "rgba(115, 221, 213, 0.9)");
+        drawVertex(B[0], B[1], "1", "rgba(239, 245, 247, 0.95)");
+        drawVertex(C[0], C[1], "2", "rgba(239, 245, 247, 0.95)");
+        drawVertex(D[0], D[1], "3", "rgba(247, 200, 74, 0.9)");
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
+        ctx.font = `${Math.max(10, width * 0.0108)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["4 vertices + 6 indices instead of 6 vertices.", "Vertices 1 and 2 (bright edge) are shared."], rect.x + 14, rect.y + rect.height - 38, 15);
+      })(panels[2]);
+
+      // Panel 4: Edge adjacency
+      (function (rect) {
+        drawLessonCanvasPanel(ctx, rect, "4. Edge adjacency", width);
+        const cx = rect.x + rect.width * 0.5;
+        const cy = rect.y + rect.height * 0.48;
+        const r = Math.min(rect.width, rect.height) * 0.26;
+
+        const center = [cx, cy];
+        const ring = [];
+        const count = 5;
+        for (let i = 0; i < count; i++) {
+          const ang = (i / count) * Math.PI * 2 - Math.PI * 0.5;
+          ring.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
+        }
+
+        const highlightEdge = Math.floor((phase * 0.5) % count);
+
+        for (let i = 0; i < count; i++) {
+          const next = (i + 1) % count;
+          const isHighlight = i === highlightEdge || i === (highlightEdge + count - 1) % count;
+          const fill = isHighlight ? "rgba(115, 221, 213, 0.2)" : "rgba(255, 255, 255, 0.04)";
+          const stroke = isHighlight ? "rgba(115, 221, 213, 0.7)" : "rgba(255, 255, 255, 0.2)";
+          drawTri([center, ring[i], ring[next]], fill, stroke);
+        }
+
+        ctx.strokeStyle = "rgba(247, 200, 74, 0.9)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(center[0], center[1]);
+        ctx.lineTo(ring[highlightEdge][0], ring[highlightEdge][1]);
+        ctx.stroke();
+
+        drawVertex(center[0], center[1], "", "rgba(239, 245, 247, 0.9)");
+        for (let i = 0; i < count; i++) {
+          drawVertex(ring[i][0], ring[i][1], "", "rgba(239, 245, 247, 0.6)");
+        }
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
+        ctx.font = `${Math.max(10, width * 0.0108)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["An edge (gold) connects two adjacent triangles.", "Knowing neighbors enables smooth normals."], rect.x + 14, rect.y + rect.height - 38, 15);
+      })(panels[3]);
+    },
+  });
+}
+
 function setupShaderVertexUseDemo() {
   const canvas = document.getElementById("shader-vertex-use-canvas");
   const ctx = get2dContext(canvas);
@@ -7371,6 +7607,258 @@ function setupVisibilityStoryDemo() {
       drawBuffers(rects[2])
     },
   })
+}
+
+function setupFramebufferConceptDemo() {
+  const canvas = document.getElementById("framebuffer-concept-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const phase = prefersReducedMotion ? 0.6 : (Math.sin(time * 0.5) * 0.5 + 0.5);
+      const margin = 24;
+      const gap = 40;
+      const boxW = (width - margin * 2 - gap * 2) / 3;
+      const boxH = height - margin * 2 - 50;
+      const topY = margin + 36;
+
+      const sceneBox = { x: margin, y: topY, w: boxW, h: boxH };
+      const fboBox = { x: margin + boxW + gap, y: topY, w: boxW, h: boxH };
+      const screenBox = { x: margin + (boxW + gap) * 2, y: topY, w: boxW, h: boxH };
+
+      function drawBox(box, title, borderColor, fillColor) {
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(box.x, box.y, box.w, box.h);
+        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+        ctx.font = `bold ${Math.max(11, width * 0.015)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText(title, box.x + 10, box.y - 8);
+      }
+
+      drawBox(sceneBox, "Scene geometry", "rgba(115, 221, 213, 0.6)", "rgba(115, 221, 213, 0.06)");
+
+      const sCx = sceneBox.x + sceneBox.w * 0.5;
+      const sCy = sceneBox.y + sceneBox.h * 0.5;
+      const sR = Math.min(sceneBox.w, sceneBox.h) * 0.18;
+
+      ctx.fillStyle = "rgba(115, 221, 213, 0.3)";
+      ctx.fillRect(sCx - sR, sCy - sR * 0.5, sR * 1.4, sR * 1.2);
+      ctx.strokeStyle = "rgba(115, 221, 213, 0.6)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(sCx - sR, sCy - sR * 0.5, sR * 1.4, sR * 1.2);
+
+      ctx.fillStyle = "rgba(247, 200, 74, 0.25)";
+      ctx.beginPath();
+      ctx.arc(sCx + sR * 0.6, sCy - sR * 0.8, sR * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(247, 200, 74, 0.5)";
+      ctx.stroke();
+
+      drawBox(fboBox, "Off-screen FBO", "rgba(247, 200, 74, 0.6)", "rgba(247, 200, 74, 0.04)");
+
+      const fCx = fboBox.x + fboBox.w * 0.5;
+      const fCy = fboBox.y + fboBox.h * 0.5;
+      const fInset = 14;
+      ctx.fillStyle = "rgba(247, 200, 74, 0.08)";
+      ctx.fillRect(fboBox.x + fInset, fboBox.y + fInset, fboBox.w - fInset * 2, fboBox.h - fInset * 2);
+      ctx.strokeStyle = "rgba(247, 200, 74, 0.3)";
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(fboBox.x + fInset, fboBox.y + fInset, fboBox.w - fInset * 2, fboBox.h - fInset * 2);
+      ctx.setLineDash([]);
+
+      const ftR = Math.min(fboBox.w, fboBox.h) * 0.14;
+      ctx.fillStyle = "rgba(115, 221, 213, 0.2)";
+      ctx.fillRect(fCx - ftR, fCy - ftR * 0.3, ftR * 1.2, ftR);
+      ctx.fillStyle = "rgba(247, 200, 74, 0.2)";
+      ctx.beginPath();
+      ctx.arc(fCx + ftR * 0.4, fCy - ftR * 0.6, ftR * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawCanvasChip(ctx, "texture", fCx, fboBox.y + fboBox.h - 30, { fontSize: Math.max(9, width * 0.011), background: "rgba(247, 200, 74, 0.15)", border: "rgba(247, 200, 74, 0.4)", color: "rgba(247, 200, 74, 0.9)" });
+
+      drawBox(screenBox, "Screen (default FB)", "rgba(180, 140, 255, 0.6)", "rgba(180, 140, 255, 0.04)");
+
+      const scrCx = screenBox.x + screenBox.w * 0.5;
+      const scrCy = screenBox.y + screenBox.h * 0.5;
+      const scrR = Math.min(screenBox.w, screenBox.h) * 0.16;
+      ctx.fillStyle = "rgba(115, 221, 213, 0.25)";
+      ctx.fillRect(scrCx - scrR, scrCy - scrR * 0.3, scrR * 1.2, scrR);
+      ctx.fillStyle = "rgba(247, 200, 74, 0.2)";
+      ctx.beginPath();
+      ctx.arc(scrCx + scrR * 0.4, scrCy - scrR * 0.6, scrR * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      const arrowY = topY + boxH * 0.5;
+      const arrowProgress1 = clamp(phase * 2, 0, 1);
+      const arrowProgress2 = clamp(phase * 2 - 0.5, 0, 1);
+
+      const a1Start = [sceneBox.x + sceneBox.w + 6, arrowY];
+      const a1End = [fboBox.x - 6, arrowY];
+      const a1Cur = [lerp(a1Start[0], a1End[0], arrowProgress1), arrowY];
+      ctx.strokeStyle = "rgba(115, 221, 213, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(a1Start[0], a1Start[1]);
+      ctx.lineTo(a1Cur[0], a1Cur[1]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (arrowProgress1 > 0.1) {
+        drawArrow2d(ctx, [a1Cur[0] - 12, arrowY], a1Cur, "rgba(115, 221, 213, 0.7)", 2);
+      }
+
+      drawCanvasChip(ctx, "Pass 1: draw to FBO", (sceneBox.x + sceneBox.w + fboBox.x) * 0.5, arrowY - 16, { fontSize: Math.max(9, width * 0.01), background: "rgba(8, 21, 30, 0.7)" });
+
+      const a2Start = [fboBox.x + fboBox.w + 6, arrowY];
+      const a2End = [screenBox.x - 6, arrowY];
+      const a2Cur = [lerp(a2Start[0], a2End[0], arrowProgress2), arrowY];
+      ctx.strokeStyle = "rgba(247, 200, 74, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(a2Start[0], a2Start[1]);
+      ctx.lineTo(a2Cur[0], a2Cur[1]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (arrowProgress2 > 0.1) {
+        drawArrow2d(ctx, [a2Cur[0] - 12, arrowY], a2Cur, "rgba(247, 200, 74, 0.7)", 2);
+      }
+
+      drawCanvasChip(ctx, "Pass 2: sample texture", (fboBox.x + fboBox.w + screenBox.x) * 0.5, arrowY - 16, { fontSize: Math.max(9, width * 0.01), background: "rgba(8, 21, 30, 0.7)" });
+    },
+  });
+}
+
+function setupMultipassStoryDemo() {
+  const canvas = document.getElementById("multipass-story-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const phase = prefersReducedMotion ? 0 : time;
+      const margin = 18;
+      const gap = 14;
+      const boxW = (width - margin * 2 - gap * 3) / 4;
+      const boxH = height - margin * 2 - 36;
+      const topY = margin + 28;
+
+      const passes = [
+        { title: "1. Shadow pass", color: "rgba(180, 140, 255, 0.6)", fill: "rgba(180, 140, 255, 0.05)", target: "FBO_shadow", content: "depth" },
+        { title: "2. Scene pass", color: "rgba(115, 221, 213, 0.6)", fill: "rgba(115, 221, 213, 0.05)", target: "FBO_scene", content: "color" },
+        { title: "3. Post-process", color: "rgba(247, 200, 74, 0.6)", fill: "rgba(247, 200, 74, 0.05)", target: "FBO_bloom", content: "bloom" },
+        { title: "4. Composite", color: "rgba(240, 130, 130, 0.6)", fill: "rgba(240, 130, 130, 0.05)", target: "Screen", content: "final" },
+      ];
+
+      const activePass = Math.floor((phase * 0.4) % 4);
+
+      for (let i = 0; i < 4; i++) {
+        const pass = passes[i];
+        const box = { x: margin + i * (boxW + gap), y: topY, w: boxW, h: boxH };
+        const isActive = i === activePass;
+
+        ctx.fillStyle = isActive ? pass.fill.replace("0.05", "0.12") : pass.fill;
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        ctx.strokeStyle = isActive ? pass.color.replace("0.6", "0.9") : pass.color;
+        ctx.lineWidth = isActive ? 2.5 : 1.5;
+        ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+        ctx.font = `bold ${Math.max(10, width * 0.013)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText(pass.title, box.x + 8, box.y - 8);
+
+        const ccx = box.x + box.w * 0.5;
+        const ccy = box.y + box.h * 0.4;
+        const cr = Math.min(box.w, box.h) * 0.2;
+
+        if (pass.content === "depth") {
+          for (let row = 0; row < 8; row++) {
+            const brightness = 0.2 + (row / 8) * 0.6;
+            ctx.fillStyle = `rgba(180, 140, 255, ${brightness * 0.3})`;
+            ctx.fillRect(ccx - cr, ccy - cr + row * (cr * 2 / 8), cr * 2, cr * 2 / 8);
+          }
+        } else if (pass.content === "color") {
+          ctx.fillStyle = "rgba(115, 221, 213, 0.2)";
+          ctx.fillRect(ccx - cr * 0.8, ccy - cr * 0.3, cr, cr * 0.8);
+          ctx.fillStyle = "rgba(247, 200, 74, 0.2)";
+          ctx.beginPath();
+          ctx.arc(ccx + cr * 0.3, ccy - cr * 0.5, cr * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+          ctx.fillRect(ccx - cr * 0.4, ccy + cr * 0.2, cr * 1.2, cr * 0.3);
+        } else if (pass.content === "bloom") {
+          for (let ring = 3; ring >= 0; ring--) {
+            ctx.fillStyle = `rgba(247, 200, 74, ${0.04 + ring * 0.03})`;
+            ctx.beginPath();
+            ctx.arc(ccx, ccy, cr * (0.5 + ring * 0.3), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          ctx.fillStyle = "rgba(115, 221, 213, 0.2)";
+          ctx.fillRect(ccx - cr * 0.8, ccy - cr * 0.3, cr, cr * 0.8);
+          ctx.fillStyle = "rgba(247, 200, 74, 0.15)";
+          ctx.beginPath();
+          ctx.arc(ccx + cr * 0.3, ccy - cr * 0.5, cr * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(247, 200, 74, 0.06)";
+          ctx.beginPath();
+          ctx.arc(ccx + cr * 0.3, ccy - cr * 0.5, cr * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        drawCanvasChip(ctx, pass.target, ccx, box.y + box.h - 20, {
+          fontSize: Math.max(8, width * 0.009),
+          background: "rgba(8, 21, 30, 0.7)",
+          border: pass.color.replace("0.6", "0.3"),
+          color: pass.color.replace("0.6", "0.9"),
+        });
+
+        if (i < 3) {
+          const arrowStartX = box.x + box.w + 4;
+          const arrowEndX = box.x + box.w + gap - 4;
+          const arrowMidY = topY + boxH * 0.5;
+          drawArrow2d(ctx, [arrowStartX, arrowMidY], [arrowEndX, arrowMidY], "rgba(239, 245, 247, 0.3)", 1.5);
+        }
+
+        if (i === 1) {
+          ctx.fillStyle = "rgba(180, 140, 255, 0.5)";
+          ctx.font = `${Math.max(8, width * 0.009)}px "Avenir Next", "Segoe UI", sans-serif`;
+          ctx.fillText("reads shadow", box.x + 6, box.y + box.h - 40);
+        } else if (i === 2) {
+          ctx.fillStyle = "rgba(115, 221, 213, 0.5)";
+          ctx.font = `${Math.max(8, width * 0.009)}px "Avenir Next", "Segoe UI", sans-serif`;
+          ctx.fillText("reads scene", box.x + 6, box.y + box.h - 40);
+        } else if (i === 3) {
+          ctx.fillStyle = "rgba(239, 245, 247, 0.4)";
+          ctx.font = `${Math.max(8, width * 0.009)}px "Avenir Next", "Segoe UI", sans-serif`;
+          ctx.fillText("reads scene + bloom", box.x + 6, box.y + box.h - 40);
+        }
+      }
+    },
+  });
 }
 
 function setupSamplingStoryDemo() {
@@ -9705,6 +10193,271 @@ function setupOrderStoryDemo() {
   });
 }
 
+function setupDeterminantAreaDemo() {
+  const canvas = document.getElementById("determinant-area-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const readoutCol1 = document.getElementById("det-readout-col1");
+  const readoutCol2 = document.getElementById("det-readout-col2");
+  const readoutValue = document.getElementById("det-readout-value");
+  const readoutOrient = document.getElementById("det-readout-orient");
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render() {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const angle1 = degreesToRadians(parseFloat(determinantControls.col1Angle?.value ?? 0));
+      const len1 = parseFloat(determinantControls.col1Len?.value ?? 100) / 100;
+      const angle2 = degreesToRadians(parseFloat(determinantControls.col2Angle?.value ?? 90));
+      const len2 = parseFloat(determinantControls.col2Len?.value ?? 100) / 100;
+
+      const a = Math.cos(angle1) * len1;
+      const c = Math.sin(angle1) * len1;
+      const b = Math.cos(angle2) * len2;
+      const d = Math.sin(angle2) * len2;
+      const det = a * d - b * c;
+
+      const cx = width * 0.5;
+      const cy = height * 0.52;
+      const scale = Math.min(width, height) * 0.28;
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+      ctx.lineWidth = 1;
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx + i * scale, cy - 3 * scale);
+        ctx.lineTo(cx + i * scale, cy + 3 * scale);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 3 * scale, cy + i * scale);
+        ctx.lineTo(cx + 3 * scale, cy + i * scale);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 3 * scale, cy);
+      ctx.lineTo(cx + 3 * scale, cy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 3 * scale);
+      ctx.lineTo(cx, cy + 3 * scale);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + scale, cy);
+      ctx.lineTo(cx + scale, cy - scale);
+      ctx.lineTo(cx, cy - scale);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const p0 = [cx, cy];
+      const p1 = [cx + a * scale, cy - c * scale];
+      const p2 = [cx + (a + b) * scale, cy - (c + d) * scale];
+      const p3 = [cx + b * scale, cy - d * scale];
+
+      const fillColor = det >= 0
+        ? `rgba(115, 221, 213, ${clamp(Math.abs(det) * 0.25, 0.05, 0.35)})`
+        : `rgba(247, 160, 74, ${clamp(Math.abs(det) * 0.25, 0.05, 0.35)})`;
+      const strokeColor = det >= 0
+        ? "rgba(115, 221, 213, 0.88)"
+        : "rgba(247, 160, 74, 0.88)";
+
+      ctx.fillStyle = fillColor;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p0[0], p0[1]);
+      ctx.lineTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.lineTo(p3[0], p3[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      drawArrow2d(ctx, [cx, cy], [cx + a * scale, cy - c * scale], "rgba(115, 221, 213, 0.92)", 2.5);
+      drawArrow2d(ctx, [cx, cy], [cx + b * scale, cy - d * scale], "rgba(247, 160, 74, 0.92)", 2.5);
+
+      ctx.fillStyle = "rgba(115, 221, 213, 0.94)";
+      ctx.font = `${Math.max(11, width * 0.018)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText("col 1", cx + a * scale * 0.5 - 16, cy - c * scale * 0.5 - 12);
+      ctx.fillStyle = "rgba(247, 160, 74, 0.94)";
+      ctx.fillText("col 2", cx + b * scale * 0.5 + 8, cy - d * scale * 0.5 - 12);
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+      ctx.font = `bold ${Math.max(13, width * 0.022)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText(`det = ${det.toFixed(3)}`, cx + (a + b) * scale * 0.5 - 30, cy - (c + d) * scale * 0.5 + 4);
+
+      if (readoutCol1) readoutCol1.textContent = `(${a.toFixed(2)}, ${c.toFixed(2)})`;
+      if (readoutCol2) readoutCol2.textContent = `(${b.toFixed(2)}, ${d.toFixed(2)})`;
+      if (readoutValue) readoutValue.textContent = det.toFixed(3);
+      if (readoutOrient) {
+        if (Math.abs(det) < 0.005) readoutOrient.textContent = "singular";
+        else if (det > 0) readoutOrient.textContent = "preserved";
+        else readoutOrient.textContent = "reversed";
+      }
+    },
+  });
+}
+
+function setupInverseRoundtripDemo() {
+  const canvas = document.getElementById("inverse-roundtrip-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const phase = prefersReducedMotion ? 0.5 : (Math.sin(time * 0.6) * 0.5 + 0.5);
+      const angle1 = degreesToRadians(parseFloat(determinantControls.col1Angle?.value ?? 0));
+      const len1 = parseFloat(determinantControls.col1Len?.value ?? 100) / 100;
+      const angle2 = degreesToRadians(parseFloat(determinantControls.col2Angle?.value ?? 90));
+      const len2 = parseFloat(determinantControls.col2Len?.value ?? 100) / 100;
+
+      const a = Math.cos(angle1) * len1;
+      const c = Math.sin(angle1) * len1;
+      const b = Math.cos(angle2) * len2;
+      const d = Math.sin(angle2) * len2;
+      const det = a * d - b * c;
+
+      const cx = width * 0.5;
+      const cy = height * 0.52;
+      const scale = Math.min(width, height) * 0.22;
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let i = -4; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx + i * scale, cy - 4 * scale);
+        ctx.lineTo(cx + i * scale, cy + 4 * scale);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 4 * scale, cy + i * scale);
+        ctx.lineTo(cx + 4 * scale, cy + i * scale);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4 * scale, cy);
+      ctx.lineTo(cx + 4 * scale, cy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 4 * scale);
+      ctx.lineTo(cx, cy + 4 * scale);
+      ctx.stroke();
+
+      const px = 0.7;
+      const py = 0.5;
+      const origX = cx + px * scale;
+      const origY = cy - py * scale;
+
+      const tx = a * px + b * py;
+      const ty = c * px + d * py;
+      const transX = cx + tx * scale;
+      const transY = cy - ty * scale;
+
+      const fwdPhase = clamp(phase * 2, 0, 1);
+      const curFwdX = lerp(origX, transX, fwdPhase);
+      const curFwdY = lerp(origY, transY, fwdPhase);
+
+      ctx.strokeStyle = "rgba(247, 200, 74, 0.6)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(origX, origY);
+      ctx.lineTo(curFwdX, curFwdY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (Math.abs(det) > 0.01) {
+        const retPhase = clamp(phase * 2 - 1, 0, 1);
+        const curRetX = lerp(transX, origX, retPhase);
+        const curRetY = lerp(transY, origY, retPhase);
+
+        ctx.strokeStyle = "rgba(115, 180, 240, 0.6)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(transX, transY);
+        ctx.lineTo(curRetX, curRetY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "rgba(115, 180, 240, 0.9)";
+        ctx.beginPath();
+        ctx.arc(curRetX, curRetY, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.9)";
+      ctx.beginPath();
+      ctx.arc(origX, origY, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(247, 200, 74, 0.9)";
+      ctx.beginPath();
+      ctx.arc(curFwdX, curFwdY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (fwdPhase >= 1) {
+        ctx.strokeStyle = "rgba(247, 200, 74, 0.4)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(transX, transY, 10, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const fontSize = Math.max(11, width * 0.016);
+      ctx.font = `${fontSize}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
+      ctx.fillText("original p", origX + 10, origY - 10);
+      ctx.fillStyle = "rgba(247, 200, 74, 0.88)";
+      ctx.fillText("M · p", transX + 10, transY - 10);
+
+      if (Math.abs(det) > 0.01) {
+        ctx.fillStyle = "rgba(115, 180, 240, 0.88)";
+        ctx.fillText("M⁻¹ · M · p = p", origX + 10, origY + 20);
+      }
+
+      if (Math.abs(det) < 0.01) {
+        ctx.fillStyle = "rgba(247, 120, 74, 0.94)";
+        ctx.font = `bold ${Math.max(13, width * 0.02)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText("det ≈ 0 — no inverse exists", cx - 100, cy + height * 0.38);
+      }
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.5)";
+      ctx.font = `${Math.max(10, width * 0.013)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText(`det(M) = ${det.toFixed(3)}`, 14, 22);
+    },
+  });
+}
+
 function setupBasisProbeDemo() {
   const canvas = document.getElementById("basis-probe-canvas");
   const ctx = get2dContext(canvas);
@@ -11198,6 +11951,307 @@ function drawShaderCodeLab(ctx, canvas, derived) {
   ctx.font = `${Math.max(12, width * 0.022)}px "Avenir Next", "Segoe UI", sans-serif`;
   ctx.fillText("vertex stage moves the mesh", 18, 24);
   ctx.fillText("fragment stage paints each cell", 18, height - 18);
+}
+
+function setupNormalMapCompareDemo() {
+  const canvas = document.getElementById("normal-map-compare-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  function bumpHeight(u, v) {
+    return (Math.sin(u * 18) * Math.cos(v * 14) * 0.5 +
+            Math.sin(u * 7 + v * 11) * 0.3 +
+            Math.cos(u * 23 - v * 5) * 0.2);
+  }
+
+  function bumpNormal(u, v) {
+    const eps = 0.005;
+    const hc = bumpHeight(u, v);
+    const hu = bumpHeight(u + eps, v);
+    const hv = bumpHeight(u, v + eps);
+    const du = (hu - hc) / eps;
+    const dv = (hv - hc) / eps;
+    const len = Math.hypot(du, dv, 1);
+    return [-du / len, -dv / len, 1 / len];
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const lightAngle = prefersReducedMotion ? 0.7 : time * 0.3;
+      const lightX = Math.cos(lightAngle);
+      const lightY = 0.3;
+      const lightZ = Math.sin(lightAngle);
+      const lightLen = Math.hypot(lightX, lightY, lightZ);
+      const lx = lightX / lightLen;
+      const ly = lightY / lightLen;
+      const lz = lightZ / lightLen;
+
+      const margin = 16;
+      const gap = 16;
+      const panelW = (width - margin * 2 - gap) / 2;
+      const panelH = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelW, height: panelH };
+      const rightRect = { x: margin + panelW + gap, y: margin, width: panelW, height: panelH };
+
+      function drawPanel(rect, title, useNormalMap) {
+        drawLessonCanvasPanel(ctx, rect, title, width);
+        const res = 80;
+        const cellW = (rect.width - 20) / res;
+        const cellH = (rect.height - 54) / res;
+        const startX = rect.x + 10;
+        const startY = rect.y + 40;
+
+        for (let iy = 0; iy < res; iy++) {
+          for (let ix = 0; ix < res; ix++) {
+            const u = ix / res;
+            const v = iy / res;
+            let nx = 0, ny = 0, nz = 1;
+
+            if (useNormalMap) {
+              const n = bumpNormal(u, v);
+              nx = n[0];
+              ny = n[1];
+              nz = n[2];
+            }
+
+            const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
+            const ambient = 0.08;
+            const brightness = Math.min(1, ambient + diff * 0.92);
+            const r = Math.floor(brightness * 180 + 40);
+            const g = Math.floor(brightness * 195 + 35);
+            const bVal = Math.floor(brightness * 210 + 30);
+            ctx.fillStyle = `rgb(${r},${g},${bVal})`;
+            ctx.fillRect(startX + ix * cellW, startY + iy * cellH, Math.ceil(cellW), Math.ceil(cellH));
+          }
+        }
+      }
+
+      drawPanel(leftRect, "Vertex normals only", false);
+      drawPanel(rightRect, "With normal map", true);
+    },
+  });
+}
+
+function setupTbnStoryDemo() {
+  const canvas = document.getElementById("tbn-story-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const tilt = prefersReducedMotion ? 0.3 : Math.sin(time * 0.4) * 0.5;
+
+      const cx = width * 0.5;
+      const cy = height * 0.55;
+      const patchSize = Math.min(width, height) * 0.3;
+      const axisLen = patchSize * 0.7;
+
+      const cosT = Math.cos(tilt);
+      const sinT = Math.sin(tilt);
+
+      const hw = patchSize;
+      const hh = patchSize * 0.5;
+      const corners = [
+        [cx - hw * cosT, cy + hh],
+        [cx + hw * cosT, cy + hh],
+        [cx + hw * cosT, cy - hh],
+        [cx - hw * cosT, cy - hh],
+      ];
+
+      const squeeze = 0.6 + sinT * 0.3;
+      for (let i = 2; i < 4; i++) {
+        corners[i][0] = cx + (corners[i][0] - cx) * squeeze;
+        corners[i][1] = cy + (corners[i][1] - cy) * squeeze * 0.8 - sinT * patchSize * 0.4;
+      }
+
+      ctx.fillStyle = "rgba(60, 80, 100, 0.4)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      const scx = (corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4;
+      const scy = (corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4;
+
+      const tvx = cosT;
+      const tvy = 0;
+      const bvx = 0;
+      const bvy = -squeeze * 0.8;
+      const nvx = sinT * 0.6;
+      const nvy = -cosT * 0.8;
+
+      drawArrow2d(ctx, [scx, scy], [scx + tvx * axisLen, scy + tvy * axisLen], "rgba(240, 90, 90, 0.9)", 2.5);
+      ctx.fillStyle = "rgba(240, 90, 90, 0.94)";
+      ctx.font = `bold ${Math.max(12, width * 0.018)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText("T", scx + tvx * axisLen + 8, scy + tvy * axisLen + 4);
+
+      drawArrow2d(ctx, [scx, scy], [scx + bvx * axisLen, scy + bvy * axisLen], "rgba(90, 210, 90, 0.9)", 2.5);
+      ctx.fillStyle = "rgba(90, 210, 90, 0.94)";
+      ctx.fillText("B", scx + bvx * axisLen + 8, scy + bvy * axisLen - 4);
+
+      drawArrow2d(ctx, [scx, scy], [scx + nvx * axisLen, scy + nvy * axisLen], "rgba(90, 150, 240, 0.9)", 2.5);
+      ctx.fillStyle = "rgba(90, 150, 240, 0.94)";
+      ctx.fillText("N", scx + nvx * axisLen + 8, scy + nvy * axisLen - 4);
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.7)";
+      ctx.font = `${Math.max(11, width * 0.014)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText("TBN = mat3(T, B, N)", 20, height - 20);
+      ctx.fillText("worldNormal = TBN \u00D7 tangentNormal", 20, height - 40);
+    },
+  });
+}
+
+function setupTbnLabDemo() {
+  const canvas = document.getElementById("tbn-lab-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const readoutT = document.getElementById("tbn-readout-t");
+  const readoutB = document.getElementById("tbn-readout-b");
+  const readoutN = document.getElementById("tbn-readout-n");
+  const readoutLight = document.getElementById("tbn-readout-light");
+
+  function bumpHeight(u, v) {
+    return (Math.sin(u * 18) * Math.cos(v * 14) * 0.5 +
+            Math.sin(u * 7 + v * 11) * 0.3 +
+            Math.cos(u * 23 - v * 5) * 0.2);
+  }
+
+  function bumpNormal(u, v) {
+    const eps = 0.005;
+    const hc = bumpHeight(u, v);
+    const hu = bumpHeight(u + eps, v);
+    const hv = bumpHeight(u, v + eps);
+    const du = (hu - hc) / eps;
+    const dv = (hv - hc) / eps;
+    const len = Math.hypot(du, dv, 1);
+    return [-du / len, -dv / len, 1 / len];
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render() {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const tiltDeg = parseFloat(tbnControls.tilt?.value ?? 30);
+      const lightDeg = parseFloat(tbnControls.light?.value ?? 45);
+      const useMap = tbnControls.useMap?.checked ?? true;
+      const showAxes = tbnControls.showAxes?.checked ?? true;
+
+      const tiltRad = degreesToRadians(tiltDeg);
+      const lightRad = degreesToRadians(lightDeg);
+
+      const T = [1, 0, 0];
+      const B = [0, Math.cos(tiltRad), Math.sin(tiltRad)];
+      const N = [0, -Math.sin(tiltRad), Math.cos(tiltRad)];
+
+      const lxr = Math.cos(lightRad) * 0.707;
+      const lyr = 0.5;
+      const lzr = Math.sin(lightRad) * 0.707;
+      const lLen = Math.hypot(lxr, lyr, lzr);
+      const lightDir = [lxr / lLen, lyr / lLen, lzr / lLen];
+
+      const res = 64;
+      const margin = 20;
+      const surfaceW = width - margin * 2;
+      const surfaceH = height - margin * 2 - 20;
+      const cellW = surfaceW / res;
+      const cellH = surfaceH / res;
+
+      for (let iy = 0; iy < res; iy++) {
+        for (let ix = 0; ix < res; ix++) {
+          const u = ix / res;
+          const v = iy / res;
+
+          let worldN;
+          if (useMap) {
+            const tn = bumpNormal(u, v);
+            worldN = [
+              T[0] * tn[0] + B[0] * tn[1] + N[0] * tn[2],
+              T[1] * tn[0] + B[1] * tn[1] + N[1] * tn[2],
+              T[2] * tn[0] + B[2] * tn[1] + N[2] * tn[2],
+            ];
+            const wLen = Math.hypot(worldN[0], worldN[1], worldN[2]);
+            worldN[0] /= wLen; worldN[1] /= wLen; worldN[2] /= wLen;
+          } else {
+            worldN = [N[0], N[1], N[2]];
+          }
+
+          const diff = Math.max(0, worldN[0] * lightDir[0] + worldN[1] * lightDir[1] + worldN[2] * lightDir[2]);
+          const brightness = Math.min(1, 0.06 + diff * 0.94);
+          const r = Math.floor(brightness * 175 + 45);
+          const g = Math.floor(brightness * 190 + 40);
+          const bVal = Math.floor(brightness * 215 + 25);
+          ctx.fillStyle = `rgb(${r},${g},${bVal})`;
+          ctx.fillRect(margin + ix * cellW, margin + 10 + iy * cellH, Math.ceil(cellW), Math.ceil(cellH));
+        }
+      }
+
+      if (showAxes) {
+        const acx = width * 0.5;
+        const acy = height * 0.5;
+        const axLen = Math.min(width, height) * 0.15;
+
+        const projT = [T[0] * axLen, -T[2] * axLen * 0.5 - T[1] * axLen * 0.3];
+        const projB = [B[0] * axLen, -B[2] * axLen * 0.5 - B[1] * axLen * 0.3];
+        const projN = [N[0] * axLen, -N[2] * axLen * 0.5 - N[1] * axLen * 0.3];
+
+        ctx.fillStyle = "rgba(8, 21, 30, 0.5)";
+        ctx.beginPath();
+        ctx.arc(acx, acy, axLen * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        drawArrow2d(ctx, [acx, acy], [acx + projT[0], acy + projT[1]], "rgba(240, 90, 90, 0.9)", 2.5);
+        drawArrow2d(ctx, [acx, acy], [acx + projB[0], acy + projB[1]], "rgba(90, 210, 90, 0.9)", 2.5);
+        drawArrow2d(ctx, [acx, acy], [acx + projN[0], acy + projN[1]], "rgba(90, 150, 240, 0.9)", 2.5);
+
+        const labelFont = `bold ${Math.max(12, width * 0.018)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.font = labelFont;
+        ctx.fillStyle = "rgba(240, 90, 90, 0.94)";
+        ctx.fillText("T", acx + projT[0] + 6, acy + projT[1] - 4);
+        ctx.fillStyle = "rgba(90, 210, 90, 0.94)";
+        ctx.fillText("B", acx + projB[0] + 6, acy + projB[1] - 4);
+        ctx.fillStyle = "rgba(90, 150, 240, 0.94)";
+        ctx.fillText("N", acx + projN[0] + 6, acy + projN[1] - 4);
+      }
+
+      if (readoutT) readoutT.textContent = `(${T[0].toFixed(2)}, ${T[1].toFixed(2)}, ${T[2].toFixed(2)})`;
+      if (readoutB) readoutB.textContent = `(${B[0].toFixed(2)}, ${B[1].toFixed(2)}, ${B[2].toFixed(2)})`;
+      if (readoutN) readoutN.textContent = `(${N[0].toFixed(2)}, ${N[1].toFixed(2)}, ${N[2].toFixed(2)})`;
+      if (readoutLight) readoutLight.textContent = `(${lightDir[0].toFixed(2)}, ${lightDir[1].toFixed(2)}, ${lightDir[2].toFixed(2)})`;
+    },
+  });
 }
 
 function setupShaderCodeLab() {
@@ -15096,6 +16150,14 @@ function setupControlListeners() {
     accelerationControls.sweep,
     accelerationControls.lod,
     accelerationControls.culling,
+    determinantControls.col1Angle,
+    determinantControls.col1Len,
+    determinantControls.col2Angle,
+    determinantControls.col2Len,
+    tbnControls.tilt,
+    tbnControls.light,
+    tbnControls.useMap,
+    tbnControls.showAxes,
   ];
 
   for (const input of inputs) {
@@ -15142,6 +16204,8 @@ function initialize() {
   safeSetup("basis-story-canvas", setupBasisStoryDemo);
   safeSetup("homogeneous-story-canvas", setupHomogeneousStoryDemo);
   safeSetup("order-story-canvas", setupOrderStoryDemo);
+  safeSetup("determinant-area-canvas", setupDeterminantAreaDemo);
+  safeSetup("inverse-roundtrip-canvas", setupInverseRoundtripDemo);
   safeSetup("vectors-canvas", setupVectorDemo);
   safeSetup("space-object-canvas", setupSpaceObjectDemo);
   safeSetup("space-world-canvas", setupSpaceWorldDemo);
@@ -15165,11 +16229,15 @@ function initialize() {
   safeSetup("shader-canvas", setupShaderDemo);
   safeSetup("shader-fluid-canvas", setupShaderFluidDemo);
   safeSetup("shader-dataflow-canvas", setupShaderDataflowDemo);
+  safeSetup("mesh-data-canvas", setupMeshDataDemo);
   safeSetup("shader-vertex-use-canvas", setupShaderVertexUseDemo);
   safeSetup("shader-fragment-use-canvas", setupShaderFragmentUseDemo);
   safeSetup("shader-uniform-use-canvas", setupShaderUniformUseDemo);
   safeSetup("shader-varying-use-canvas", setupShaderVaryingUseDemo);
   safeSetup("normal-code-canvas", setupNormalCodeLab);
+  safeSetup("normal-map-compare-canvas", setupNormalMapCompareDemo);
+  safeSetup("tbn-story-canvas", setupTbnStoryDemo);
+  safeSetup("tbn-lab-canvas", setupTbnLabDemo);
   safeSetup("shader-code-canvas", setupShaderCodeLab);
   safeSetup("basis-probe-canvas", setupBasisProbeDemo);
   safeSetup("vectors-code-canvas", setupVectorsCodeLab);
@@ -15179,6 +16247,8 @@ function initialize() {
   safeSetup("shader-probe-canvas", setupShaderProbeDemo);
   safeSetup("triangle-story-canvas", setupTriangleStoryDemo);
   safeSetup("visibility-story-canvas", setupVisibilityStoryDemo);
+  safeSetup("framebuffer-concept-canvas", setupFramebufferConceptDemo);
+  safeSetup("multipass-story-canvas", setupMultipassStoryDemo);
   safeSetup("rendering-code-canvas", setupRenderingCodeLab);
   safeSetup("pipeline-canvas", setupPipelineDemo);
   safeSetup("projection-canvas", setupProjectionDemo);

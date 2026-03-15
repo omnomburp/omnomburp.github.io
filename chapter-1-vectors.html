@@ -56,6 +56,8 @@
             <a href="#affine">Affine bridge</a>
             <a href="#walkthrough">Translation and w</a>
             <a href="#order-matters">Order matters</a>
+            <a href="#determinant">Determinant</a>
+            <a href="#inverse">Matrix inverse</a>
             <a href="#lab">Live lab</a>
             <a href="#playground">Point playground</a>
             <a href="#code-lab">Guided code lab</a>
@@ -651,6 +653,151 @@ translation needs special treatment.</code></pre>
                   <p>The shape turns first, so the later scale happens along axes that have already been rotated.</p>
                 </article>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="determinant">
+          <div class="section-header">
+            <p class="eyebrow">Determinant</p>
+            <h2>The determinant measures how much a transform scales area</h2>
+            <p>
+              Apply any 2×2 matrix to the unit square and measure the area of the resulting parallelogram.
+              That number is the determinant. A positive value means the winding order is preserved.
+              A negative value means the shape has been mirrored. Zero means the shape collapsed to a line or point.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Column 1 angle</span>
+                  <input id="det-col1-angle" type="range" min="-180" max="180" value="0" />
+                </label>
+                <label class="control">
+                  <span>Column 1 length</span>
+                  <input id="det-col1-len" type="range" min="10" max="200" value="100" />
+                </label>
+                <label class="control">
+                  <span>Column 2 angle</span>
+                  <input id="det-col2-angle" type="range" min="-180" max="180" value="90" />
+                </label>
+                <label class="control">
+                  <span>Column 2 length</span>
+                  <input id="det-col2-len" type="range" min="10" max="200" value="100" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Start with both angles at default. The unit square stays a unit square and the determinant is <code>1.0</code>.</li>
+                <li>Change one column length. The parallelogram stretches and the determinant scales with it.</li>
+                <li>Drag column 1 angle past column 2. The determinant crosses zero and flips sign — the winding reversed.</li>
+                <li>Make both columns point the same direction. The shape collapses to a line and the determinant hits zero — the matrix is singular.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="determinant-area-canvas" class="canvas-stage" aria-label="Determinant as parallelogram area"></canvas>
+              <p class="canvas-caption">The shaded parallelogram is the image of the unit square. Its signed area is the determinant.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Column 1</h3>
+              <code id="det-readout-col1">(1.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Column 2</h3>
+              <code id="det-readout-col2">(0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>det(M)</h3>
+              <code id="det-readout-value">1.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Orientation</h3>
+              <code id="det-readout-orient">preserved</code>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// 2×2 determinant
+det = a * d - b * c
+
+// columns of M
+col1 = (a, c)
+col2 = (b, d)
+
+// det is the signed area of
+// the parallelogram they span</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why it matters</h3>
+                <p>The determinant tells you whether a transform preserves, reverses, or destroys the shape's interior. A zero determinant means the transform squashes space into a lower dimension — no inverse can recover the lost information.</p>
+              </article>
+              <article class="mini-card">
+                <h3>3D extension</h3>
+                <p>In three dimensions the determinant measures signed volume instead of signed area. The idea is the same: the three columns of the matrix span a parallelepiped.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="inverse">
+          <div class="section-header">
+            <p class="eyebrow">Matrix inverse</p>
+            <h2>The inverse matrix undoes a transform exactly</h2>
+            <p>
+              If a matrix M moves every point to a new location, M⁻¹ moves them back.
+              Applying M then M⁻¹ returns every point to where it started — the composition is the identity matrix.
+              An inverse exists only when the determinant is non-zero, because a collapsed shape cannot be un-collapsed.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="inverse-roundtrip-canvas" class="canvas-stage canvas-stage-wide" aria-label="Matrix inverse round-trip animation"></canvas>
+            <p class="canvas-caption">A point is transformed by M (yellow path) then by M⁻¹ (blue path), returning to the start. When det approaches zero, the return path breaks.</p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>M moves a point</h3>
+              <p>The matrix takes the original coordinates and produces new ones through the basis-weight recipe you already know.</p>
+            </article>
+            <article class="mini-card">
+              <h3>M⁻¹ reverses the move</h3>
+              <p>The inverse matrix encodes the opposite recipe. Given the transformed coordinates, it recovers the originals.</p>
+            </article>
+            <article class="mini-card">
+              <h3>The round trip is the identity</h3>
+              <p><code>M⁻¹ · M = I</code>. Composing a matrix with its inverse produces the do-nothing matrix.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Singular means no inverse</h3>
+              <p>When the determinant is zero the matrix collapses space. Multiple input points land on the same output, so no single reverse path exists.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// 2×2 inverse
+// M = | a  b |
+//     | c  d |
+//
+// M⁻¹ = (1/det) | d  -b |
+//                |-c   a |
+//
+// only exists when det ≠ 0</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Where this appears in graphics</h3>
+                <p>View transforms need the inverse to go from screen back to world (ray casting, picking). The normal matrix is the transpose of the inverse of the model matrix. Shadow maps convert world positions into light space and back.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Cost in practice</h3>
+                <p>Engines rarely compute a general inverse. Most transforms are compositions of rotation, scale, and translation, so the inverse is built by reversing each step — much cheaper than the general formula.</p>
+              </article>
             </div>
           </div>
         </section>

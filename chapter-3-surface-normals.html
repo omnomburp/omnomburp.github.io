@@ -53,6 +53,9 @@
             <a href="#lab">Live lab</a>
             <a href="#meter">Alignment meter</a>
             <a href="#code-lab">Guided code lab</a>
+            <a href="#normal-maps">Normal maps</a>
+            <a href="#tangent-space">Tangent space</a>
+            <a href="#tbn-lab">TBN lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -534,6 +537,191 @@ fix_normal_matrix = true</textarea>
           </div>
         </section>
 
+        <section class="panel reveal-block" id="normal-maps">
+          <div class="section-header">
+            <p class="eyebrow">Normal maps</p>
+            <h2>A texture can store perturbed normals so a flat surface looks detailed</h2>
+            <p>
+              Normal mapping encodes small surface bumps as direction vectors packed into RGB texels.
+              The fragment shader reads the per-texel normal instead of the interpolated vertex normal,
+              adding visual detail without extra geometry. A flat quad can look like carved stone.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="normal-map-compare-canvas" class="canvas-stage canvas-stage-wide" aria-label="Normal mapping before and after comparison"></canvas>
+            <p class="canvas-caption">Left: vertex normals only — the surface is smooth and featureless. Right: the same geometry with a procedural normal map — light reveals bumps that do not exist in the mesh.</p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>The geometry stays flat</h3>
+              <p>Normal maps add visual complexity without adding triangles. The silhouette remains unchanged, but the interior lighting creates an illusion of surface detail.</p>
+            </article>
+            <article class="mini-card">
+              <h3>RGB stores XYZ</h3>
+              <p>Each texel's red, green, and blue channels encode a direction vector. The value <code>(128, 128, 255)</code> maps to <code>(0, 0, 1)</code> — pointing straight out of the surface.</p>
+            </article>
+            <article class="mini-card">
+              <h3>The dominant color is blue-purple</h3>
+              <p>Most normals point roughly outward, so the Z component is close to 1.0 and the blue channel dominates. Slight tilts shift the red and green channels away from 128.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Lighting uses the texture normal</h3>
+              <p>The fragment shader substitutes the sampled normal for the interpolated vertex normal before computing the dot product with the light direction.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// sample and unpack
+vec3 nTex = texture(normalMap, uv).rgb;
+vec3 n = nTex * 2.0 - 1.0;
+// n is now in tangent space: (0,0,1) = flat
+
+// lighting uses this instead of vertex normal
+float diffuse = max(dot(n, lightDir), 0.0);</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why 2.0 - 1.0?</h3>
+                <p>Texture channels store values in [0, 1]. Normals live in [-1, 1]. The <code>* 2 - 1</code> remapping converts storage range to direction range.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Limitation: silhouettes</h3>
+                <p>Normal maps change shading but not geometry. At grazing angles, the flat silhouette reveals that the bumps are an illusion. Displacement mapping solves this by actually moving vertices.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="tangent-space">
+          <div class="section-header">
+            <p class="eyebrow">Tangent space</p>
+            <h2>Normal maps are authored in a local frame that needs a TBN matrix to reach world space</h2>
+            <p>
+              A normal map stores directions relative to a flat surface pointing up. When that surface is tilted,
+              rotated, or curved in the scene, you need a per-vertex coordinate frame — the tangent, bitangent, and normal —
+              to transform the map's local directions into world space. That 3×3 matrix is called the TBN matrix.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="tbn-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="TBN matrix construction explainer"></canvas>
+            <p class="canvas-caption">
+              A tilted surface patch with its tangent (red), bitangent (green), and normal (blue) axes.
+              The TBN matrix columns are these three vectors. Multiplying a tangent-space normal by TBN produces the world-space normal.
+            </p>
+          </article>
+
+          <div class="step-grid">
+            <article class="mini-card">
+              <h3>T: tangent</h3>
+              <p>The tangent vector lies along the surface in the direction of increasing U in the texture. It comes from the triangle's edge vectors and UV differences.</p>
+            </article>
+            <article class="mini-card">
+              <h3>B: bitangent</h3>
+              <p>The bitangent lies along the surface in the V direction, perpendicular to both the tangent and the normal. It is often computed as <code>cross(N, T)</code>.</p>
+            </article>
+            <article class="mini-card">
+              <h3>N: normal</h3>
+              <p>The vertex normal you already know. It points away from the surface and is the third axis of the local frame.</p>
+            </article>
+            <article class="mini-card">
+              <h3>TBN transforms tangent-space to world-space</h3>
+              <p><code>worldNormal = TBN * tangentNormal</code>. The columns of TBN are T, B, and N. A tangent-space (0, 0, 1) maps directly to the vertex normal — no perturbation.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>// build TBN per vertex
+mat3 TBN = mat3(T, B, N);
+
+// transform sampled normal to world space
+vec3 n = TBN * (texture(normalMap, uv).rgb * 2.0 - 1.0);
+n = normalize(n);
+
+// then use n for lighting as usual
+float diffuse = max(dot(n, lightDir), 0.0);</code></pre>
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Where tangents come from</h3>
+                <p>Tangents are derived from the triangle's edge vectors and UV coordinate differences. Most mesh exporters precompute them, or you can compute them at load time from the position and UV attributes.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Orthogonalization</h3>
+                <p>Interpolation can make T and N non-perpendicular. A Gram-Schmidt step re-orthogonalizes them in the fragment shader: <code>T = normalize(T - dot(T, N) * N)</code>.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="tbn-lab">
+          <div class="section-header">
+            <p class="eyebrow">TBN lab</p>
+            <h2>Tilt the surface and watch the TBN frame follow the geometry</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The surface patch tilts in 3D. The tangent, bitangent, and normal axes rotate with it.
+                When the normal map is enabled, each fragment reads a perturbed direction from the map,
+                transforms it through TBN, and lights the surface with the result. Toggle the map off
+                to see how flat the surface actually is.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Surface tilt</span>
+                  <input id="tbn-tilt" type="range" min="-80" max="80" value="30" />
+                </label>
+                <label class="control">
+                  <span>Light angle</span>
+                  <input id="tbn-light" type="range" min="-180" max="180" value="45" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Normal map</span>
+                  <input id="tbn-use-map" type="checkbox" checked />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show TBN axes</span>
+                  <input id="tbn-show-axes" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Tilt the surface to 0 degrees. The TBN frame aligns with the world axes.</li>
+                <li>Toggle the normal map off. The surface goes flat — all detail disappears.</li>
+                <li>Move the light angle with the map on. The bumps respond to light direction just like real geometry would.</li>
+                <li>At extreme tilts, the TBN frame rotates with the surface, keeping bump lighting correct.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="tbn-lab-canvas" class="canvas-stage" aria-label="TBN normal mapping interactive lab"></canvas>
+              <p class="canvas-caption">Red = tangent, green = bitangent, blue = normal. The TBN frame is the bridge between the map's local directions and world-space lighting.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Tangent (T)</h3>
+              <code id="tbn-readout-t">(1.00, 0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Bitangent (B)</h3>
+              <code id="tbn-readout-b">(0.00, 1.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Normal (N)</h3>
+              <code id="tbn-readout-n">(0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Light dir</h3>
+              <code id="tbn-readout-light">(0.71, 0.00, 0.71)</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -551,7 +739,7 @@ fix_normal_matrix = true</textarea>
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Normal, dot product, diffuse light, alignment, interpolation, inverse transpose.</p>
+              <p>Normal, dot product, diffuse light, alignment, interpolation, inverse transpose, normal map, tangent space, TBN matrix, bitangent.</p>
             </article>
           </div>
         </section>

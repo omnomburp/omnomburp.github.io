@@ -2787,8 +2787,6 @@ function setupSpaceContractDemo() {
 
   const stageColors = ["#f7a04a", "#f4c16e", "#9fd7ff", "#73ddd5"];
   const stageNames = ["Object", "World", "View", "Clip"];
-  const stageFooters = ["model-local", "scene-relative", "camera-relative", "pre-divide clip"];
-
   registerDemo({
     canvas,
     visible: true,
@@ -2851,18 +2849,6 @@ function setupSpaceContractDemo() {
 
         const pointCanvas = projectRectPoint(rect, stage, extentX, extentY);
         drawCanvasDot(ctx, pointCanvas, Math.max(6, width * 0.0072), stageColors[index]);
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.9)";
-        ctx.font = `${Math.max(10, width * 0.0118)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
-        const valueText =
-          index === 3
-            ? `${formatNumber(stage[0], 2)}, ${formatNumber(stage[1], 2)}, w ${formatNumber(stage[3], 2)}`
-            : `${formatNumber(stage[0], 2)}, ${formatNumber(stage[1], 2)}`;
-        ctx.fillText(valueText, rect.x + 14, rect.y + 34);
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.8)";
-        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
-        drawTextLines(ctx, [stageFooters[index]], rect.x + 14, rect.y + rect.height - 20, Math.max(11, width * 0.011 * 1.2), rect.width - 28);
       }
     },
   });
@@ -2910,7 +2896,7 @@ function setupCameraFrameStoryDemo() {
       }
 
       function drawWorldPanel(rect) {
-        drawLessonCanvasPanel(ctx, rect, "World space camera pose", width);
+        drawLessonCanvasPanel(ctx, rect, "World", width);
         drawRectAxesGrid(ctx, rect, extentX, extentY, width);
         const cameraCanvas = projectRectPoint(rect, camera, extentX, extentY);
         const targetCanvas = projectRectPoint(rect, target, extentX, extentY);
@@ -2929,7 +2915,7 @@ function setupCameraFrameStoryDemo() {
       }
 
       function drawViewPanel(rect) {
-        drawLessonCanvasPanel(ctx, rect, "View space rewrite", width);
+        drawLessonCanvasPanel(ctx, rect, "View", width);
         const origin = drawRectAxesGrid(ctx, rect, extentX, extentY, width);
         const viewTarget = toView(target);
         ctx.setLineDash([8, 6]);
@@ -2965,13 +2951,6 @@ function setupWorkedExampleStoryDemo() {
   }
 
   const stageNames = ["Object", "World", "View", "Clip", "NDC"];
-  const stageNotes = [
-    "local to the model",
-    "placed in the scene",
-    "camera-relative",
-    "homogeneous pre-divide",
-    "normalized for viewport mapping",
-  ];
   const stageColors = ["#f7a04a", "#f4c16e", "#9fd7ff", "#f8b37d", "#73ddd5"];
 
   registerDemo({
@@ -3004,7 +2983,7 @@ function setupWorkedExampleStoryDemo() {
       const currentStage = prefersReducedMotion ? 2 : Math.floor((time * 0.72) % stages.length);
       const margin = 18;
       const gap = 14;
-      const footerHeight = 40;
+      const footerHeight = 0;
       const columns = width >= 980 ? 5 : 3;
       const rows = Math.ceil(stages.length / columns);
       const boxWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
@@ -3057,9 +3036,6 @@ function setupWorkedExampleStoryDemo() {
         ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
         ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
         ctx.fillText(stageNames[index], rect.x + 12, rect.y + 18);
-        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
-        ctx.font = `${Math.max(9, width * 0.0105)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.fillText(stageNotes[index], rect.x + 12, rect.y + 34);
 
         drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.62);
         if (isClip) {
@@ -3088,13 +3064,6 @@ function setupWorkedExampleStoryDemo() {
           Math.max(2, width * 0.0028)
         );
       }
-
-      const current = stages[currentStage];
-      const currentLabel =
-        currentStage === 3 ? `p_clip = ${formatVector(current, 2)}` : `p_${stageNames[currentStage].toLowerCase()} = ${formatVector(current, 2)}`;
-      ctx.fillStyle = "rgba(239, 245, 247, 0.9)";
-      ctx.font = `${Math.max(10, width * 0.0115)}px "Avenir Next", "Segoe UI", sans-serif`;
-      drawTextLines(ctx, [`Current: ${stageNames[currentStage]} -> ${currentLabel}`], margin, height - 24, Math.max(12, width * 0.0115 * 1.2), width - margin * 2);
     },
   });
 }
@@ -3186,7 +3155,7 @@ function setupGameSpacesStoryDemo() {
         ctx.stroke();
       }
 
-      function drawPickup(rect, point, extentX, extentY, color, label) {
+      function drawPickup(rect, point, extentX, extentY, color) {
         const p = projectInRect(rect, point, extentX, extentY);
         ctx.save();
         ctx.translate(p[0], p[1]);
@@ -3201,23 +3170,6 @@ function setupGameSpacesStoryDemo() {
         ctx.closePath();
         ctx.stroke();
         ctx.restore();
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
-        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.fillText(label, p[0] + 10, p[1] - 10);
-      }
-
-      function drawLabel(text, x, y, maxWidth = 150) {
-        ctx.save();
-        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
-        const lines = wrapCanvasTextLine(ctx, text, maxWidth);
-        const lineHeight = Math.max(11, width * 0.011 * 1.24);
-        const textWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
-        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
-        ctx.fillRect(x - 6, y - 4, textWidth + 12, lines.length * lineHeight + 8);
-        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-        drawTextLines(ctx, lines, x, y, lineHeight, maxWidth);
-        ctx.restore();
       }
 
       function drawPanelBackground(rect, title, extentX, extentY) {
@@ -3231,7 +3183,7 @@ function setupGameSpacesStoryDemo() {
       ctx.lineJoin = "round";
       drawLessonCanvasBackground(ctx, width, height);
 
-      drawPanelBackground(objectRect, "Object space: authored around origin", objectExtentX, objectExtentY);
+      drawPanelBackground(objectRect, "Object", objectExtentX, objectExtentY);
       drawShip(objectRect, [0, 0], 0, objectExtentX, objectExtentY, "rgba(247, 160, 74, 0.24)", "rgba(247, 160, 74, 0.96)");
       const objectOrigin = projectInRect(objectRect, [0, 0], objectExtentX, objectExtentY);
       drawArrow2d(
@@ -3248,22 +3200,18 @@ function setupGameSpacesStoryDemo() {
         "rgba(115, 221, 213, 0.94)",
         Math.max(2.1, width * 0.003)
       );
-      drawLabel("shipLocal", objectRect.x + 16, objectRect.y + objectRect.height - 50, objectRect.width - 32);
-
-      drawPanelBackground(worldRect, "World space: shared arena", worldExtentX, worldExtentY);
+      drawPanelBackground(worldRect, "World", worldExtentX, worldExtentY);
       drawShip(worldRect, shipWorld, shipAngle, worldExtentX, worldExtentY, "rgba(247, 160, 74, 0.22)", "rgba(247, 160, 74, 0.96)");
-      drawPickup(worldRect, pickupWorld, worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)", "pickupWorld");
-      drawPickup(worldRect, enemyWorld, worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)", "enemyWorld");
+      drawPickup(worldRect, pickupWorld, worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)");
+      drawPickup(worldRect, enemyWorld, worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)");
       const shipWorldCanvas = projectInRect(worldRect, shipWorld, worldExtentX, worldExtentY);
       const cameraWorldCanvas = projectInRect(worldRect, cameraWorld, worldExtentX, worldExtentY);
       drawCameraGlyph(ctx, cameraWorldCanvas, shipAngle, Math.max(9, width * 0.0115), "rgba(255, 223, 132, 0.88)");
       ctx.setLineDash([8, 6]);
       drawArrow2d(ctx, cameraWorldCanvas, shipWorldCanvas, "rgba(255, 223, 132, 0.82)", Math.max(1.8, width * 0.0027));
       ctx.setLineDash([]);
-      drawLabel("cameraWorld", cameraWorldCanvas[0] + 10, cameraWorldCanvas[1] + 8);
-      drawLabel("shipWorld", shipWorldCanvas[0] + 10, shipWorldCanvas[1] - 26);
 
-      drawPanelBackground(viewRect, "View space: rewritten around camera", worldExtentX, worldExtentY);
+      drawPanelBackground(viewRect, "View", worldExtentX, worldExtentY);
       const cameraOrigin = projectInRect(viewRect, [0, 0], worldExtentX, worldExtentY);
       drawCameraGlyph(ctx, cameraOrigin, 0, Math.max(9, width * 0.0115), "rgba(255, 223, 132, 0.88)");
       drawShip(
@@ -3275,8 +3223,8 @@ function setupGameSpacesStoryDemo() {
         "rgba(247, 160, 74, 0.22)",
         "rgba(247, 160, 74, 0.96)"
       );
-      drawPickup(viewRect, worldToView(pickupWorld), worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)", "pickupView");
-      drawPickup(viewRect, worldToView(enemyWorld), worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)", "enemyView");
+      drawPickup(viewRect, worldToView(pickupWorld), worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)");
+      drawPickup(viewRect, worldToView(enemyWorld), worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)");
       ctx.setLineDash([8, 6]);
       drawArrow2d(
         ctx,
@@ -3286,7 +3234,6 @@ function setupGameSpacesStoryDemo() {
         Math.max(1.8, width * 0.0027)
       );
       ctx.setLineDash([]);
-      drawLabel("camera at origin", viewRect.x + 16, viewRect.y + viewRect.height - 50, viewRect.width - 32);
     },
   });
 }
@@ -3788,25 +3735,12 @@ function setupGameNormalsStoryDemo() {
         }
       }
 
-      function drawTag(text, x, y, maxWidth = 130) {
-        ctx.save();
-        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
-        const lines = wrapCanvasTextLine(ctx, text, maxWidth);
-        const lineHeight = Math.max(11, width * 0.011 * 1.22);
-        const textWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
-        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
-        ctx.fillRect(x - 6, y - 4, textWidth + 12, lines.length * lineHeight + 8);
-        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-        drawTextLines(ctx, lines, x, y, lineHeight, maxWidth);
-        ctx.restore();
-      }
-
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, width, height);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#182f42");
-      drawLessonCanvasPanel(ctx, sceneRect, "Action-game flashlight vs curved shield", width);
+      drawLessonCanvasPanel(ctx, sceneRect, "Flashlight vs shield", width);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
       ctx.lineWidth = 1;
@@ -3904,11 +3838,6 @@ function setupGameNormalsStoryDemo() {
         "rgba(247, 160, 74, 0.92)",
         Math.max(2, width * 0.0028)
       );
-
-      drawTag("flashlight", flashCanvas[0] + 12, flashCanvas[1] - 24);
-      drawTag("n", bestCanvas[0] + 18, bestCanvas[1] - 24, 40);
-      drawTag("l", (bestCanvas[0] + flashCanvas[0]) * 0.5, (bestCanvas[1] + flashCanvas[1]) * 0.5 - 16, 40);
-      drawTag(`dot(n, l) = ${formatNumber(best.brightness, 2)}`, sceneRect.x + 16, sceneRect.y + sceneRect.height - 46, 180);
     },
   });
 }
@@ -6899,7 +6828,7 @@ function setupFoundationTypesDemo() {
       function drawPointPanel(rect) {
         const extentX = 2.9;
         const extentY = 2.4;
-        drawLessonCanvasPanel(ctx, rect, "Point: location moves", width);
+        drawLessonCanvasPanel(ctx, rect, "Point", width);
         drawRectAxesGrid(ctx, rect, extentX, extentY, width);
         const startCanvas = projectRectPoint(rect, pointStart, extentX, extentY);
         const endCanvas = projectRectPoint(rect, pointEnd, extentX, extentY);
@@ -6917,16 +6846,12 @@ function setupFoundationTypesDemo() {
           "rgba(115, 221, 213, 0.98)",
           Math.max(2, width * 0.003)
         );
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
-        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
-        drawTextLines(ctx, ["same point, new location"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
       }
 
       function drawOffsetPanel(rect) {
         const extentX = 2.9;
         const extentY = 2.4;
-        drawLessonCanvasPanel(ctx, rect, "Offset: span stays the same", width);
+        drawLessonCanvasPanel(ctx, rect, "Offset", width);
         drawRectAxesGrid(ctx, rect, extentX, extentY, width);
         const startCanvas = projectRectPoint(rect, offsetStart, extentX, extentY);
         const endCanvas = projectRectPoint(rect, offsetEnd, extentX, extentY);
@@ -6950,16 +6875,12 @@ function setupFoundationTypesDemo() {
         drawCanvasDot(ctx, endCanvas, Math.max(4.5, width * 0.006), "rgba(247, 160, 74, 0.9)");
         drawCanvasDot(ctx, movedStartCanvas, Math.max(4.5, width * 0.006), "rgba(115, 221, 213, 0.92)");
         drawCanvasDot(ctx, movedEndCanvas, Math.max(4.5, width * 0.006), "rgba(115, 221, 213, 0.92)");
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
-        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
-        drawTextLines(ctx, ["same offset after relocation"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
       }
 
       function drawDirectionPanel(rect) {
         const extentX = 2.9;
         const extentY = 2.4;
-        drawLessonCanvasPanel(ctx, rect, "Direction: orientation only", width);
+        drawLessonCanvasPanel(ctx, rect, "Direction", width);
         drawRectAxesGrid(ctx, rect, extentX, extentY, width);
         const anchorACanvas = projectRectPoint(rect, directionAnchorA, extentX, extentY);
         const anchorBCanvas = projectRectPoint(rect, directionAnchorB, extentX, extentY);
@@ -6974,10 +6895,6 @@ function setupFoundationTypesDemo() {
         drawArrow2d(ctx, anchorBCanvas, tipBCanvas, "rgba(115, 221, 213, 0.94)", Math.max(2.1, width * 0.003));
         drawCanvasDot(ctx, anchorACanvas, Math.max(4, width * 0.0055), "rgba(247, 160, 74, 0.9)");
         drawCanvasDot(ctx, anchorBCanvas, Math.max(4, width * 0.0055), "rgba(115, 221, 213, 0.9)");
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
-        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
-        drawTextLines(ctx, ["same direction, new anchor"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7056,28 +6973,12 @@ function setupGameVectorsStoryDemo() {
         ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
       }
 
-      function drawLabel(text, point, side = "right") {
-        ctx.save();
-        ctx.font = `${Math.max(10, width * 0.0118)}px "Avenir Next", "Segoe UI", sans-serif`;
-        ctx.textAlign = "left";
-        const lines = wrapCanvasTextLine(ctx, text, 120);
-        const lineHeight = Math.max(12, width * 0.0118 * 1.24);
-        const maxWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
-        const x = side === "left" ? point[0] - maxWidth - 14 : point[0] + 8;
-        const y = point[1] - lineHeight * lines.length * 0.5 - 3;
-        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
-        ctx.fillRect(x - 6, y - 4, maxWidth + 12, lineHeight * lines.length + 8);
-        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-        drawTextLines(ctx, lines, x, y, lineHeight, 120);
-        ctx.restore();
-      }
-
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, width, height);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       drawLessonCanvasBackground(ctx, width, height);
-      drawLessonCanvasPanel(ctx, arenaRect, "Top-down game: vectors in motion", width);
+      drawLessonCanvasPanel(ctx, arenaRect, "Arena vectors", width);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
       ctx.lineWidth = 1;
@@ -7149,33 +7050,6 @@ function setupGameVectorsStoryDemo() {
       drawCanvasDot(ctx, playerCanvas, Math.max(9, width * 0.0104), "rgba(247, 160, 74, 0.96)", "rgba(255, 245, 216, 0.98)", Math.max(1.8, width * 0.0026));
       drawCanvasDot(ctx, enemyCanvas, Math.max(10, width * 0.011), "rgba(115, 221, 213, 0.92)", "rgba(214, 248, 245, 0.96)", Math.max(1.8, width * 0.0026));
       drawCanvasDot(ctx, projectileCanvas, Math.max(4.8, width * 0.0062), "rgba(255, 245, 216, 0.98)");
-
-      drawLabel("playerPos", playerCanvas);
-      drawLabel("enemyPos", enemyCanvas, "left");
-      drawLabel("velocity", velocityCanvas);
-      drawLabel("aimDir", aimCanvas);
-      drawLabel("enemy - player", [
-        (playerCanvas[0] + enemyCanvas[0]) * 0.5,
-        (playerCanvas[1] + enemyCanvas[1]) * 0.5 - 10,
-      ]);
-      if (knockbackStrength > 0.1) {
-        drawLabel("knockback", enemyCanvas);
-      }
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
-      ctx.font = `${Math.max(10, width * 0.0114)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
-      drawTextLines(
-        ctx,
-        [
-          `velocity = ${formatVector(velocity, 2)}`,
-          `toEnemy = ${formatVector(toEnemy, 2)}`,
-          `playerPos += velocity * dt`,
-        ],
-        arenaRect.x + 16,
-        arenaRect.y + arenaRect.height - Math.max(62, width * 0.06),
-        Math.max(12, width * 0.0114 * 1.26),
-        220
-      );
     },
   });
 }
@@ -7246,7 +7120,7 @@ function setupMatrixColumnsDemo() {
       ctx.lineJoin = "round";
       drawLessonCanvasBackground(ctx, width, height);
 
-      drawLessonCanvasPanel(ctx, plotRect, "Columns become basis directions", width);
+      drawLessonCanvasPanel(ctx, plotRect, "Columns as axes", width);
       drawRectAxesGrid(ctx, plotRect, extentX, extentY, width);
       drawPolygon(unitSquare, "rgba(255, 255, 255, 0.05)", "rgba(255, 255, 255, 0.18)");
       drawPolygon(parallelogram, "rgba(115, 221, 213, 0.22)", "rgba(115, 221, 213, 0.92)");
@@ -7260,40 +7134,19 @@ function setupMatrixColumnsDemo() {
       drawCanvasDot(ctx, basisICanvas, Math.max(5.5, width * 0.0066), "rgba(247, 160, 74, 0.96)");
       drawCanvasDot(ctx, basisJCanvas, Math.max(5.5, width * 0.0066), "rgba(115, 221, 213, 0.96)");
       drawCanvasDot(ctx, cornerCanvas, Math.max(6.5, width * 0.0076), "rgba(255, 245, 216, 0.96)");
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
-      ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
-      ctx.fillText("column 1", basisICanvas[0] + 10, basisICanvas[1] - 10);
-      ctx.fillText("column 2", basisJCanvas[0] + 10, basisJCanvas[1] - 10);
-      ctx.fillText("(1, 1) = column 1 + column 2", cornerCanvas[0] + 12, cornerCanvas[1] - 10);
-
-      drawLessonCanvasPanel(ctx, infoRect, "Read the multiplication", width);
+      drawLessonCanvasPanel(ctx, infoRect, "Read it", width);
       ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
       ctx.font = `${Math.max(12, width * 0.015)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
       drawTextLines(
         ctx,
         [
-          `M = [ ${formatNumber(basisI[0], 2)}  ${formatNumber(basisJ[0], 2)} ]`,
-          `    [ ${formatNumber(basisI[1], 2)}  ${formatNumber(basisJ[1], 2)} ]`,
-          "",
-          `M * (1, 0) = ${formatVector(basisI, 2)}`,
-          `M * (0, 1) = ${formatVector(basisJ, 2)}`,
-          `M * (1, 1) = ${formatVector(add2(basisI, basisJ), 2)}`,
+          `M(1, 0) = ${formatVector(basisI, 2)}`,
+          `M(0, 1) = ${formatVector(basisJ, 2)}`,
+          `M(1, 1) = ${formatVector(add2(basisI, basisJ), 2)}`,
         ],
         infoRect.x + 16,
-        infoRect.y + 38,
+        infoRect.y + Math.max(34, infoRect.height * 0.28),
         Math.max(15, width * 0.0145 * 1.3),
-        infoRect.width - 32
-      );
-
-      ctx.fillStyle = "rgba(239, 245, 247, 0.82)";
-      ctx.font = `${Math.max(10, width * 0.0118)}px "Avenir Next", "Segoe UI", sans-serif`;
-      drawTextLines(
-        ctx,
-        ["The columns are the new local axes.", "The unit square follows those axes into the transformed shape."],
-        infoRect.x + 16,
-        infoRect.y + infoRect.height - Math.max(64, width * 0.07),
-        Math.max(13, width * 0.0128 * 1.34),
         infoRect.width - 32
       );
     },
@@ -7391,10 +7244,6 @@ function setupAffineStoryDemo() {
           Math.max(6, width * 0.0076),
           showTranslation ? "rgba(247, 160, 74, 0.96)" : "rgba(115, 221, 213, 0.96)"
         );
-
-        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
-        ctx.font = `${Math.max(10, width * 0.012)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
-        ctx.fillText(showTranslation ? "A * 0 + t = t" : "A * 0 = 0", rect.x + 14, rect.y + rect.height - 16);
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7402,8 +7251,8 @@ function setupAffineStoryDemo() {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       drawLessonCanvasBackground(ctx, width, height);
-      drawPanel(linearRect, "Linear only", false);
-      drawPanel(affineRect, "Linear plus translation", true);
+      drawPanel(linearRect, "Linear", false);
+      drawPanel(affineRect, "Affine", true);
     },
   });
 }

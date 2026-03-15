@@ -949,6 +949,90 @@ function drawArrow2d(ctx, from, to, color, lineWidth = 2.2) {
   ctx.fill();
 }
 
+function projectRectPoint(rect, point, extentX, extentY, paddingX = 16, paddingY = 18, centerY = 0.56) {
+  return [
+    rect.x + rect.width * 0.5 + (point[0] / extentX) * (rect.width * 0.5 - paddingX),
+    rect.y + rect.height * centerY - (point[1] / extentY) * (rect.height * 0.5 - paddingY),
+  ];
+}
+
+function drawRectAxesGrid(ctx, rect, extentX, extentY, width, centerY = 0.56) {
+  const maxX = Math.max(1, Math.floor(extentX));
+  const maxY = Math.max(1, Math.floor(extentY));
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+  ctx.lineWidth = 1;
+  for (let index = -maxY; index <= maxY; index += 1) {
+    const start = projectRectPoint(rect, [-extentX, index], extentX, extentY, 16, 18, centerY);
+    const end = projectRectPoint(rect, [extentX, index], extentX, extentY, 16, 18, centerY);
+    ctx.beginPath();
+    ctx.moveTo(start[0], start[1]);
+    ctx.lineTo(end[0], end[1]);
+    ctx.stroke();
+  }
+
+  for (let index = -maxX; index <= maxX; index += 1) {
+    const start = projectRectPoint(rect, [index, -extentY], extentX, extentY, 16, 18, centerY);
+    const end = projectRectPoint(rect, [index, extentY], extentX, extentY, 16, 18, centerY);
+    ctx.beginPath();
+    ctx.moveTo(start[0], start[1]);
+    ctx.lineTo(end[0], end[1]);
+    ctx.stroke();
+  }
+
+  const origin = projectRectPoint(rect, [0, 0], extentX, extentY, 16, 18, centerY);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.lineWidth = Math.max(1.5, width * 0.0028);
+  ctx.beginPath();
+  ctx.moveTo(rect.x + 14, origin[1]);
+  ctx.lineTo(rect.x + rect.width - 14, origin[1]);
+  ctx.moveTo(origin[0], rect.y + 16);
+  ctx.lineTo(origin[0], rect.y + rect.height - 16);
+  ctx.stroke();
+  return origin;
+}
+
+function drawCanvasDot(ctx, point, radius, fillStyle, strokeStyle = "", lineWidth = 0) {
+  ctx.beginPath();
+  ctx.arc(point[0], point[1], radius, 0, TAU);
+  if (fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }
+  if (strokeStyle) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth || 1.5;
+    ctx.stroke();
+  }
+}
+
+function drawCameraGlyph(ctx, center, angle, size, fillStyle, strokeStyle = "rgba(239, 245, 247, 0.92)") {
+  const forward = [Math.cos(angle), -Math.sin(angle)];
+  const right = [-forward[1], forward[0]];
+  const tip = [center[0] + forward[0] * size * 1.1, center[1] + forward[1] * size * 1.1];
+  const left = [
+    center[0] - forward[0] * size * 0.68 + right[0] * size * 0.66,
+    center[1] - forward[1] * size * 0.68 + right[1] * size * 0.66,
+  ];
+  const rightPoint = [
+    center[0] - forward[0] * size * 0.68 - right[0] * size * 0.66,
+    center[1] - forward[1] * size * 0.68 - right[1] * size * 0.66,
+  ];
+
+  ctx.fillStyle = fillStyle;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = Math.max(1.5, size * 0.14);
+  ctx.beginPath();
+  ctx.moveTo(tip[0], tip[1]);
+  ctx.lineTo(left[0], left[1]);
+  ctx.lineTo(rightPoint[0], rightPoint[1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  drawCanvasDot(ctx, center, Math.max(3, size * 0.18), "rgba(8, 21, 30, 0.78)", strokeStyle, Math.max(1.2, size * 0.08));
+}
+
 function drawTextLines(ctx, lines, x, y, lineHeight, maxWidth = Infinity) {
   ctx.save();
   ctx.textBaseline = "top";
@@ -2694,6 +2778,519 @@ function setupSpaceClipDemo() {
   });
 }
 
+function setupSpaceContractDemo() {
+  const canvas = document.getElementById("space-contract-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const stageColors = ["#f7a04a", "#f4c16e", "#9fd7ff", "#73ddd5"];
+  const stageNames = ["Object", "World", "View", "Clip"];
+  const stageFooters = ["model-local", "scene-relative", "camera-relative", "pre-divide clip"];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.14 : time * 0.7;
+      const object = [
+        0.82 + Math.sin(phase * 0.92) * 0.18,
+        0.42 + Math.cos(phase * 1.06) * 0.12,
+        1.04 + Math.sin(phase * 0.64) * 0.14,
+        1,
+      ];
+      const model = mat4Multiply(
+        mat4Translation(1.1, -0.18, -0.64),
+        mat4Multiply(mat4RotationY(0.42 + Math.sin(phase * 0.56) * 0.14), mat4RotationX(-0.24))
+      );
+      const view = mat4LookAt([1.95, 1.2, 4.04], [0.35, 0.1, 0], [0, 1, 0]);
+      const projection = mat4Perspective(degreesToRadians(52), 1.25, 0.1, 20);
+      const world = transformPoint(model, object);
+      const viewPoint = transformPoint(view, world);
+      const clip = transformPoint(projection, viewPoint);
+      const stages = [object, world, viewPoint, clip];
+      const margin = 18;
+      const gap = 16;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = (height - margin * 2 - gap) / 2;
+      const rects = [
+        { x: margin, y: margin, width: panelWidth, height: panelHeight },
+        { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight },
+        { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight },
+        { x: margin + panelWidth + gap, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight },
+      ];
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      for (let index = 0; index < rects.length; index += 1) {
+        const rect = rects[index];
+        const stage = stages[index];
+        const isClip = index === 3;
+        const extentX = isClip ? Math.max(1.25, Math.abs(stage[3]) * 1.18, Math.abs(stage[0]) * 1.1) : Math.max(1.4, Math.abs(stage[0]) * 1.2);
+        const extentY = isClip ? Math.max(1.25, Math.abs(stage[3]) * 1.18, Math.abs(stage[1]) * 1.1) : Math.max(1.35, Math.abs(stage[1]) * 1.22);
+        drawLessonCanvasPanel(ctx, rect, stageNames[index], width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+
+        if (isClip) {
+          const clipW = Math.max(Math.abs(stage[3]), 0.25);
+          const topLeft = projectRectPoint(rect, [-clipW, clipW], extentX, extentY);
+          const bottomRight = projectRectPoint(rect, [clipW, -clipW], extentX, extentY);
+          ctx.strokeStyle = "rgba(255, 223, 132, 0.92)";
+          ctx.lineWidth = Math.max(1.8, width * 0.0028);
+          ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        }
+
+        const pointCanvas = projectRectPoint(rect, stage, extentX, extentY);
+        drawCanvasDot(ctx, pointCanvas, Math.max(6, width * 0.0072), stageColors[index]);
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.9)";
+        ctx.font = `${Math.max(10, width * 0.0118)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
+        const valueText =
+          index === 3
+            ? `${formatNumber(stage[0], 2)}, ${formatNumber(stage[1], 2)}, w ${formatNumber(stage[3], 2)}`
+            : `${formatNumber(stage[0], 2)}, ${formatNumber(stage[1], 2)}`;
+        ctx.fillText(valueText, rect.x + 14, rect.y + 34);
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.8)";
+        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, [stageFooters[index]], rect.x + 14, rect.y + rect.height - 20, Math.max(11, width * 0.011 * 1.2), rect.width - 28);
+      }
+    },
+  });
+}
+
+function setupCameraFrameStoryDemo() {
+  const canvas = document.getElementById("camera-frame-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const worldPoints = [
+    { point: [0.72, 0.28], color: "rgba(247, 160, 74, 0.96)" },
+    { point: [-0.84, -0.38], color: "rgba(159, 215, 255, 0.96)" },
+    { point: [1.38, -0.54], color: "rgba(115, 221, 213, 0.96)" },
+  ];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.08 : time * 0.72;
+      const margin = 18;
+      const gap = 16;
+      const stacked = width < 760;
+      const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap) / 2;
+      const panelHeight = stacked ? (height - margin * 2 - gap) / 2 : height - margin * 2;
+      const worldRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const viewRect = stacked
+        ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
+        : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const camera = [-1.18 + Math.sin(phase * 0.86) * 0.72, -0.64 + Math.cos(phase * 0.58) * 0.18];
+      const target = [0.74, 0.22];
+      const cameraAngle = Math.atan2(target[1] - camera[1], target[0] - camera[0]);
+      const extentX = 2.8;
+      const extentY = 2.25;
+
+      function toView(point) {
+        return rotate2(subtract2(point, camera), -cameraAngle);
+      }
+
+      function drawWorldPanel(rect) {
+        drawLessonCanvasPanel(ctx, rect, "World space camera pose", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        const cameraCanvas = projectRectPoint(rect, camera, extentX, extentY);
+        const targetCanvas = projectRectPoint(rect, target, extentX, extentY);
+        ctx.setLineDash([8, 6]);
+        drawArrow2d(ctx, cameraCanvas, targetCanvas, "rgba(255, 223, 132, 0.82)", Math.max(1.8, width * 0.0028));
+        ctx.setLineDash([]);
+        drawCameraGlyph(ctx, cameraCanvas, cameraAngle, Math.max(10, width * 0.013), "rgba(255, 223, 132, 0.9)");
+        for (const entry of worldPoints) {
+          drawCanvasDot(
+            ctx,
+            projectRectPoint(rect, entry.point, extentX, extentY),
+            Math.max(5, width * 0.006),
+            entry.color
+          );
+        }
+      }
+
+      function drawViewPanel(rect) {
+        drawLessonCanvasPanel(ctx, rect, "View space rewrite", width);
+        const origin = drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        const viewTarget = toView(target);
+        ctx.setLineDash([8, 6]);
+        drawArrow2d(ctx, origin, projectRectPoint(rect, viewTarget, extentX, extentY), "rgba(255, 223, 132, 0.82)", Math.max(1.8, width * 0.0028));
+        ctx.setLineDash([]);
+        drawCameraGlyph(ctx, origin, 0, Math.max(10, width * 0.013), "rgba(255, 223, 132, 0.9)");
+        for (const entry of worldPoints) {
+          drawCanvasDot(
+            ctx,
+            projectRectPoint(rect, toView(entry.point), extentX, extentY),
+            Math.max(5, width * 0.006),
+            entry.color
+          );
+        }
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawWorldPanel(worldRect);
+      drawViewPanel(viewRect);
+    },
+  });
+}
+
+function setupWorkedExampleStoryDemo() {
+  const canvas = document.getElementById("worked-example-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const stageNames = ["Object", "World", "View", "Clip", "NDC"];
+  const stageNotes = [
+    "local to the model",
+    "placed in the scene",
+    "camera-relative",
+    "homogeneous pre-divide",
+    "normalized for viewport mapping",
+  ];
+  const stageColors = ["#f7a04a", "#f4c16e", "#9fd7ff", "#f8b37d", "#73ddd5"];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.6 : time * 0.72;
+      const object = [
+        0.82 + Math.sin(phase * 0.84) * 0.14,
+        0.36 + Math.cos(phase * 1.06) * 0.12,
+        1.02 + Math.sin(phase * 0.58) * 0.12,
+        1,
+      ];
+      const model = mat4Multiply(
+        mat4Translation(1.18, -0.16, -0.68),
+        mat4Multiply(mat4RotationY(0.44 + Math.sin(phase * 0.5) * 0.12), mat4RotationX(-0.24))
+      );
+      const view = mat4LookAt([1.95, 1.2, 4.05], [0.35, 0.1, 0], [0, 1, 0]);
+      const projection = mat4Perspective(degreesToRadians(52), 1.2, 0.1, 20);
+      const world = transformPoint(model, object);
+      const viewPoint = transformPoint(view, world);
+      const clip = transformPoint(projection, viewPoint);
+      const safeW = Math.abs(clip[3]) < 1e-6 ? 1e-6 : clip[3];
+      const ndc = [clip[0] / safeW, clip[1] / safeW, clip[2] / safeW];
+      const stages = [object, world, viewPoint, clip, ndc];
+      const currentStage = prefersReducedMotion ? 2 : Math.floor((time * 0.72) % stages.length);
+      const margin = 18;
+      const gap = 14;
+      const footerHeight = 40;
+      const columns = width >= 980 ? 5 : 3;
+      const rows = Math.ceil(stages.length / columns);
+      const boxWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
+      const boxHeight = (height - margin * 2 - footerHeight - gap * (rows - 1)) / rows;
+      const rects = [];
+
+      for (let index = 0; index < stages.length; index += 1) {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        rects.push({
+          x: margin + column * (boxWidth + gap),
+          y: margin + row * (boxHeight + gap),
+          width: boxWidth,
+          height: boxHeight,
+        });
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      if (rows === 1) {
+        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+        for (let index = 0; index < rects.length - 1; index += 1) {
+          const left = rects[index];
+          const right = rects[index + 1];
+          const start = [left.x + left.width + 6, left.y + left.height * 0.5];
+          const end = [right.x - 6, right.y + right.height * 0.5];
+          drawArrow2d(ctx, start, end, "rgba(255, 255, 255, 0.16)", Math.max(1.4, width * 0.0024));
+        }
+      }
+
+      for (let index = 0; index < rects.length; index += 1) {
+        const rect = rects[index];
+        const stage = stages[index];
+        const isClip = index === 3;
+        const isNdc = index === 4;
+        const isActive = index === currentStage;
+        const extentX = isNdc ? 1.1 : isClip ? Math.max(1.2, Math.abs(stage[3]) * 1.15, Math.abs(stage[0]) * 1.1) : Math.max(1.35, Math.abs(stage[0]) * 1.2);
+        const extentY = isNdc ? 1.1 : isClip ? Math.max(1.2, Math.abs(stage[3]) * 1.15, Math.abs(stage[1]) * 1.1) : Math.max(1.35, Math.abs(stage[1]) * 1.2);
+
+        ctx.fillStyle = isActive ? "rgba(255, 255, 255, 0.1)" : "rgba(8, 21, 30, 0.22)";
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.strokeStyle = isActive ? "rgba(255, 245, 216, 0.82)" : "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = isActive ? Math.max(2, width * 0.003) : 1;
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
+        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText(stageNames[index], rect.x + 12, rect.y + 18);
+        ctx.fillStyle = "rgba(239, 245, 247, 0.76)";
+        ctx.font = `${Math.max(9, width * 0.0105)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText(stageNotes[index], rect.x + 12, rect.y + 34);
+
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.62);
+        if (isClip) {
+          const clipW = Math.max(Math.abs(stage[3]), 0.25);
+          const topLeft = projectRectPoint(rect, [-clipW, clipW], extentX, extentY, 16, 24, 0.62);
+          const bottomRight = projectRectPoint(rect, [clipW, -clipW], extentX, extentY, 16, 24, 0.62);
+          ctx.strokeStyle = "rgba(248, 179, 125, 0.9)";
+          ctx.lineWidth = Math.max(1.6, width * 0.0026);
+          ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        }
+        if (isNdc) {
+          const topLeft = projectRectPoint(rect, [-1, 1], extentX, extentY, 16, 24, 0.62);
+          const bottomRight = projectRectPoint(rect, [1, -1], extentX, extentY, 16, 24, 0.62);
+          ctx.strokeStyle = "rgba(115, 221, 213, 0.9)";
+          ctx.lineWidth = Math.max(1.6, width * 0.0026);
+          ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        }
+
+        const pointCanvas = projectRectPoint(rect, stage, extentX, extentY, 16, 24, 0.62);
+        drawCanvasDot(
+          ctx,
+          pointCanvas,
+          Math.max(5.5, width * 0.0066),
+          stageColors[index],
+          isActive ? "rgba(255, 245, 216, 0.96)" : "",
+          Math.max(2, width * 0.0028)
+        );
+      }
+
+      const current = stages[currentStage];
+      const currentLabel =
+        currentStage === 3 ? `p_clip = ${formatVector(current, 2)}` : `p_${stageNames[currentStage].toLowerCase()} = ${formatVector(current, 2)}`;
+      ctx.fillStyle = "rgba(239, 245, 247, 0.9)";
+      ctx.font = `${Math.max(10, width * 0.0115)}px "Avenir Next", "Segoe UI", sans-serif`;
+      drawTextLines(ctx, [`Current: ${stageNames[currentStage]} -> ${currentLabel}`], margin, height - 24, Math.max(12, width * 0.0115 * 1.2), width - margin * 2);
+    },
+  });
+}
+
+function setupGameSpacesStoryDemo() {
+  const canvas = document.getElementById("game-spaces-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const shipLocal = [
+    [-0.7, -0.34],
+    [0.86, 0],
+    [-0.7, 0.34],
+    [-0.22, 0],
+  ];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.12 : time * 0.76;
+      const margin = 18;
+      const gap = 16;
+      const stacked = width < 920;
+      const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap * 2) / 3;
+      const panelHeight = stacked ? (height - margin * 2 - gap * 2) / 3 : height - margin * 2;
+      const objectRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const worldRect = stacked
+        ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
+        : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const viewRect = stacked
+        ? { x: margin, y: margin + (panelHeight + gap) * 2, width: panelWidth, height: panelHeight }
+        : { x: margin + (panelWidth + gap) * 2, y: margin, width: panelWidth, height: panelHeight };
+      const worldExtentX = 3.8;
+      const worldExtentY = 2.8;
+      const objectExtentX = 2.1;
+      const objectExtentY = 1.6;
+
+      const shipWorld = [
+        0.42 + Math.cos(phase * 0.86) * 1.12,
+        -0.1 + Math.sin(phase * 0.94) * 0.84,
+      ];
+      const shipVelocity = [
+        -Math.sin(phase * 0.86) * 1.12 * 0.86,
+        Math.cos(phase * 0.94) * 0.84 * 0.94,
+      ];
+      const shipForward = normalize2(shipVelocity);
+      const shipAngle = Math.atan2(shipForward[1], shipForward[0]);
+      const cameraWorld = add2(shipWorld, rotate2([-1.26, -0.22], shipAngle));
+      const pickupWorld = [
+        1.92 + Math.cos(phase * 0.44) * 0.28,
+        1.02 + Math.sin(phase * 0.58) * 0.22,
+      ];
+      const enemyWorld = [
+        -1.48 + Math.sin(phase * 0.62) * 0.34,
+        1.18 + Math.cos(phase * 0.52) * 0.2,
+      ];
+
+      function worldToView(point) {
+        return rotate2(subtract2(point, cameraWorld), -shipAngle);
+      }
+
+      function projectInRect(rect, point, extentX, extentY) {
+        return projectRectPoint(rect, point, extentX, extentY, 16, 22, 0.6);
+      }
+
+      function drawShip(rect, center, angle, extentX, extentY, fill, stroke) {
+        const points = shipLocal.map((point) => add2(center, rotate2(point, angle)));
+        ctx.beginPath();
+        for (let index = 0; index < points.length; index += 1) {
+          const projected = projectInRect(rect, points[index], extentX, extentY);
+          if (index === 0) {
+            ctx.moveTo(projected[0], projected[1]);
+          } else {
+            ctx.lineTo(projected[0], projected[1]);
+          }
+        }
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = Math.max(1.8, width * 0.0028);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawPickup(rect, point, extentX, extentY, color, label) {
+        const p = projectInRect(rect, point, extentX, extentY);
+        ctx.save();
+        ctx.translate(p[0], p[1]);
+        ctx.rotate(phase * 0.8);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1.8, width * 0.0026);
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(10, 0);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(-10, 0);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
+        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.fillText(label, p[0] + 10, p[1] - 10);
+      }
+
+      function drawLabel(text, x, y, maxWidth = 150) {
+        ctx.save();
+        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
+        const lines = wrapCanvasTextLine(ctx, text, maxWidth);
+        const lineHeight = Math.max(11, width * 0.011 * 1.24);
+        const textWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
+        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
+        ctx.fillRect(x - 6, y - 4, textWidth + 12, lines.length * lineHeight + 8);
+        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+        drawTextLines(ctx, lines, x, y, lineHeight, maxWidth);
+        ctx.restore();
+      }
+
+      function drawPanelBackground(rect, title, extentX, extentY) {
+        drawLessonCanvasPanel(ctx, rect, title, width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      drawPanelBackground(objectRect, "Object space: authored around origin", objectExtentX, objectExtentY);
+      drawShip(objectRect, [0, 0], 0, objectExtentX, objectExtentY, "rgba(247, 160, 74, 0.24)", "rgba(247, 160, 74, 0.96)");
+      const objectOrigin = projectInRect(objectRect, [0, 0], objectExtentX, objectExtentY);
+      drawArrow2d(
+        ctx,
+        objectOrigin,
+        projectInRect(objectRect, [1.18, 0], objectExtentX, objectExtentY),
+        "rgba(247, 160, 74, 0.94)",
+        Math.max(2.1, width * 0.003)
+      );
+      drawArrow2d(
+        ctx,
+        objectOrigin,
+        projectInRect(objectRect, [0, 0.96], objectExtentX, objectExtentY),
+        "rgba(115, 221, 213, 0.94)",
+        Math.max(2.1, width * 0.003)
+      );
+      drawLabel("shipLocal", objectRect.x + 16, objectRect.y + objectRect.height - 50, objectRect.width - 32);
+
+      drawPanelBackground(worldRect, "World space: shared arena", worldExtentX, worldExtentY);
+      drawShip(worldRect, shipWorld, shipAngle, worldExtentX, worldExtentY, "rgba(247, 160, 74, 0.22)", "rgba(247, 160, 74, 0.96)");
+      drawPickup(worldRect, pickupWorld, worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)", "pickupWorld");
+      drawPickup(worldRect, enemyWorld, worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)", "enemyWorld");
+      const shipWorldCanvas = projectInRect(worldRect, shipWorld, worldExtentX, worldExtentY);
+      const cameraWorldCanvas = projectInRect(worldRect, cameraWorld, worldExtentX, worldExtentY);
+      drawCameraGlyph(ctx, cameraWorldCanvas, shipAngle, Math.max(9, width * 0.0115), "rgba(255, 223, 132, 0.88)");
+      ctx.setLineDash([8, 6]);
+      drawArrow2d(ctx, cameraWorldCanvas, shipWorldCanvas, "rgba(255, 223, 132, 0.82)", Math.max(1.8, width * 0.0027));
+      ctx.setLineDash([]);
+      drawLabel("cameraWorld", cameraWorldCanvas[0] + 10, cameraWorldCanvas[1] + 8);
+      drawLabel("shipWorld", shipWorldCanvas[0] + 10, shipWorldCanvas[1] - 26);
+
+      drawPanelBackground(viewRect, "View space: rewritten around camera", worldExtentX, worldExtentY);
+      const cameraOrigin = projectInRect(viewRect, [0, 0], worldExtentX, worldExtentY);
+      drawCameraGlyph(ctx, cameraOrigin, 0, Math.max(9, width * 0.0115), "rgba(255, 223, 132, 0.88)");
+      drawShip(
+        viewRect,
+        worldToView(shipWorld),
+        0,
+        worldExtentX,
+        worldExtentY,
+        "rgba(247, 160, 74, 0.22)",
+        "rgba(247, 160, 74, 0.96)"
+      );
+      drawPickup(viewRect, worldToView(pickupWorld), worldExtentX, worldExtentY, "rgba(115, 221, 213, 0.94)", "pickupView");
+      drawPickup(viewRect, worldToView(enemyWorld), worldExtentX, worldExtentY, "rgba(159, 215, 255, 0.92)", "enemyView");
+      ctx.setLineDash([8, 6]);
+      drawArrow2d(
+        ctx,
+        cameraOrigin,
+        projectInRect(viewRect, worldToView(shipWorld), worldExtentX, worldExtentY),
+        "rgba(255, 223, 132, 0.82)",
+        Math.max(1.8, width * 0.0027)
+      );
+      ctx.setLineDash([]);
+      drawLabel("camera at origin", viewRect.x + 16, viewRect.y + viewRect.height - 50, viewRect.width - 32);
+    },
+  });
+}
+
 function setupSpaceMapStoryDemo() {
   const canvas = document.getElementById("space-map-canvas");
   const ctx = get2dContext(canvas);
@@ -3143,6 +3740,175 @@ function setupClipStoryDemo() {
       if (readouts.pixel) {
         readouts.pixel.textContent = `(${Math.round(viewportPoint[0])}, ${Math.round(viewportPoint[1])})`;
       }
+    },
+  });
+}
+
+function setupGameNormalsStoryDemo() {
+  const canvas = document.getElementById("game-normals-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.16 : time * 0.84;
+      const sceneRect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 4.2;
+      const extentY = 2.8;
+      const flashlight = [-2.5, 0.18 + Math.sin(phase * 0.86) * 0.92];
+      const shieldCenter = [1.48, 0];
+      const shieldRadius = 1.06;
+      const sampleCount = 30;
+      const samples = [];
+      let best = null;
+
+      function toScene(point) {
+        return projectRectPoint(sceneRect, point, extentX, extentY, 18, 22, 0.6);
+      }
+
+      for (let index = 0; index <= sampleCount; index += 1) {
+        const t = index / sampleCount;
+        const phi = -1.08 + t * 2.16;
+        const point = [shieldCenter[0] - Math.cos(phi) * shieldRadius, shieldCenter[1] + Math.sin(phi) * shieldRadius];
+        const normal = normalize2(subtract2(point, shieldCenter));
+        const lightDir = normalize2(subtract2(flashlight, point));
+        const brightness = Math.max(dot2(normal, lightDir), 0);
+        const sample = { point, normal, lightDir, brightness };
+        samples.push(sample);
+        if (!best || brightness > best.brightness) {
+          best = sample;
+        }
+      }
+
+      function drawTag(text, x, y, maxWidth = 130) {
+        ctx.save();
+        ctx.font = `${Math.max(9, width * 0.011)}px "Avenir Next", "Segoe UI", sans-serif`;
+        const lines = wrapCanvasTextLine(ctx, text, maxWidth);
+        const lineHeight = Math.max(11, width * 0.011 * 1.22);
+        const textWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
+        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
+        ctx.fillRect(x - 6, y - 4, textWidth + 12, lines.length * lineHeight + 8);
+        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+        drawTextLines(ctx, lines, x, y, lineHeight, maxWidth);
+        ctx.restore();
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#182f42");
+      drawLessonCanvasPanel(ctx, sceneRect, "Action-game flashlight vs curved shield", width);
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let x = -4; x <= 4; x += 1) {
+        const start = toScene([x, -extentY]);
+        const end = toScene([x, extentY]);
+        ctx.beginPath();
+        ctx.moveTo(start[0], start[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.stroke();
+      }
+      for (let y = -2; y <= 2; y += 1) {
+        const start = toScene([-extentX, y]);
+        const end = toScene([extentX, y]);
+        ctx.beginPath();
+        ctx.moveTo(start[0], start[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.stroke();
+      }
+
+      const floorStart = toScene([-extentX, -1.7]);
+      const floorEnd = toScene([extentX, -1.7]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = Math.max(1.6, width * 0.0024);
+      ctx.beginPath();
+      ctx.moveTo(floorStart[0], floorStart[1]);
+      ctx.lineTo(floorEnd[0], floorEnd[1]);
+      ctx.stroke();
+
+      const flashCanvas = toScene(flashlight);
+      const bestCanvas = toScene(best.point);
+      const upperBeam = toScene(samples[Math.max(0, samples.indexOf(best) - 4)].point);
+      const lowerBeam = toScene(samples[Math.min(samples.length - 1, samples.indexOf(best) + 4)].point);
+      ctx.fillStyle = "rgba(255, 223, 132, 0.08)";
+      ctx.beginPath();
+      ctx.moveTo(flashCanvas[0], flashCanvas[1]);
+      ctx.lineTo(upperBeam[0], upperBeam[1]);
+      ctx.lineTo(lowerBeam[0], lowerBeam[1]);
+      ctx.closePath();
+      ctx.fill();
+
+      for (let index = 0; index < samples.length - 1; index += 1) {
+        const a = toScene(samples[index].point);
+        const b = toScene(samples[index + 1].point);
+        const brightness = (samples[index].brightness + samples[index + 1].brightness) * 0.5;
+        ctx.strokeStyle = `rgba(${Math.round(247 - brightness * 32)}, ${Math.round(160 + brightness * 55)}, ${Math.round(74 + brightness * 122)}, 0.95)`;
+        ctx.lineWidth = Math.max(12, width * 0.016);
+        ctx.beginPath();
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+      ctx.lineWidth = Math.max(1.2, width * 0.002);
+      ctx.beginPath();
+      for (let index = 0; index < samples.length; index += 1) {
+        const p = toScene(samples[index].point);
+        if (index === 0) {
+          ctx.moveTo(p[0], p[1]);
+        } else {
+          ctx.lineTo(p[0], p[1]);
+        }
+      }
+      ctx.stroke();
+
+      drawCanvasDot(ctx, flashCanvas, Math.max(8, width * 0.0094), "rgba(255, 223, 132, 0.96)", "rgba(255, 245, 216, 0.98)", Math.max(1.6, width * 0.0024));
+      ctx.fillStyle = "rgba(255, 223, 132, 0.96)";
+      ctx.beginPath();
+      ctx.moveTo(flashCanvas[0] + 10, flashCanvas[1]);
+      ctx.lineTo(flashCanvas[0] - 8, flashCanvas[1] - 8);
+      ctx.lineTo(flashCanvas[0] - 8, flashCanvas[1] + 8);
+      ctx.closePath();
+      ctx.fill();
+
+      for (let index = 4; index < samples.length; index += 5) {
+        const sample = samples[index];
+        const start = toScene(sample.point);
+        const end = toScene(add2(sample.point, scale2(sample.normal, 0.42)));
+        drawArrow2d(ctx, start, end, "rgba(255, 255, 255, 0.45)", Math.max(1.4, width * 0.0022));
+      }
+
+      drawCanvasDot(ctx, bestCanvas, Math.max(7, width * 0.0082), "rgba(255, 245, 216, 0.98)");
+      drawArrow2d(
+        ctx,
+        bestCanvas,
+        toScene(add2(best.point, scale2(best.normal, 0.72))),
+        "rgba(255, 255, 255, 0.96)",
+        Math.max(2.2, width * 0.003)
+      );
+      drawArrow2d(
+        ctx,
+        bestCanvas,
+        flashCanvas,
+        "rgba(247, 160, 74, 0.92)",
+        Math.max(2, width * 0.0028)
+      );
+
+      drawTag("flashlight", flashCanvas[0] + 12, flashCanvas[1] - 24);
+      drawTag("n", bestCanvas[0] + 18, bestCanvas[1] - 24, 40);
+      drawTag("l", (bestCanvas[0] + flashCanvas[0]) * 0.5, (bestCanvas[1] + flashCanvas[1]) * 0.5 - 16, 40);
+      drawTag(`dot(n, l) = ${formatNumber(best.brightness, 2)}`, sceneRect.x + 16, sceneRect.y + sceneRect.height - 46, 180);
     },
   });
 }
@@ -6083,6 +6849,561 @@ function setupColorDemo() {
       gl.uniform1f(locations.gamma, Number(colorControls.gamma.value) / 10);
       gl.uniform1f(locations.toneMap, colorControls.tonemap.checked ? 1 : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    },
+  });
+}
+
+function setupFoundationTypesDemo() {
+  const canvas = document.getElementById("foundation-types-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.1 : time * 0.82;
+      const margin = 18;
+      const gap = 16;
+      const stacked = width < 900;
+      const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap * 2) / 3;
+      const panelHeight = stacked ? (height - margin * 2 - gap * 2) / 3 : height - margin * 2;
+      const translation = [Math.sin(phase * 0.9) * 0.62, 0.32 + Math.cos(phase * 0.68) * 0.22];
+      const pointStart = [0.92, 0.42];
+      const pointEnd = add2(pointStart, scale2(translation, 0.92));
+      const offsetStart = [-1.4, -0.72];
+      const offsetDelta = [1.42, 0.88];
+      const offsetEnd = add2(offsetStart, offsetDelta);
+      const movedOffsetStart = add2(offsetStart, scale2(translation, 0.76));
+      const movedOffsetEnd = add2(offsetEnd, scale2(translation, 0.76));
+      const direction = normalize2([1, 0.34 + Math.sin(phase * 1.18) * 0.26]);
+      const directionVector = scale2(direction, 1.38);
+      const directionAnchorA = [-1.18, -0.44];
+      const directionAnchorB = add2(directionAnchorA, scale2(translation, 0.9));
+      const rects = [
+        { x: margin, y: margin, width: panelWidth, height: panelHeight },
+        stacked
+          ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
+          : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight },
+        stacked
+          ? { x: margin, y: margin + (panelHeight + gap) * 2, width: panelWidth, height: panelHeight }
+          : { x: margin + (panelWidth + gap) * 2, y: margin, width: panelWidth, height: panelHeight },
+      ];
+
+      function drawPointPanel(rect) {
+        const extentX = 2.9;
+        const extentY = 2.4;
+        drawLessonCanvasPanel(ctx, rect, "Point: location moves", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        const startCanvas = projectRectPoint(rect, pointStart, extentX, extentY);
+        const endCanvas = projectRectPoint(rect, pointEnd, extentX, extentY);
+
+        ctx.setLineDash([8, 6]);
+        drawArrow2d(ctx, startCanvas, endCanvas, "rgba(255, 223, 132, 0.88)", Math.max(1.8, width * 0.0028));
+        ctx.setLineDash([]);
+
+        drawCanvasDot(ctx, startCanvas, Math.max(5, width * 0.0065), "rgba(247, 160, 74, 0.92)");
+        drawCanvasDot(
+          ctx,
+          endCanvas,
+          Math.max(7, width * 0.0082),
+          "rgba(115, 221, 213, 0.3)",
+          "rgba(115, 221, 213, 0.98)",
+          Math.max(2, width * 0.003)
+        );
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
+        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["same point, new location"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
+      }
+
+      function drawOffsetPanel(rect) {
+        const extentX = 2.9;
+        const extentY = 2.4;
+        drawLessonCanvasPanel(ctx, rect, "Offset: span stays the same", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        const startCanvas = projectRectPoint(rect, offsetStart, extentX, extentY);
+        const endCanvas = projectRectPoint(rect, offsetEnd, extentX, extentY);
+        const movedStartCanvas = projectRectPoint(rect, movedOffsetStart, extentX, extentY);
+        const movedEndCanvas = projectRectPoint(rect, movedOffsetEnd, extentX, extentY);
+
+        ctx.setLineDash([7, 6]);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.lineWidth = Math.max(1.4, width * 0.0024);
+        ctx.beginPath();
+        ctx.moveTo(startCanvas[0], startCanvas[1]);
+        ctx.lineTo(movedStartCanvas[0], movedStartCanvas[1]);
+        ctx.moveTo(endCanvas[0], endCanvas[1]);
+        ctx.lineTo(movedEndCanvas[0], movedEndCanvas[1]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        drawArrow2d(ctx, startCanvas, endCanvas, "rgba(247, 160, 74, 0.86)", Math.max(2, width * 0.003));
+        drawArrow2d(ctx, movedStartCanvas, movedEndCanvas, "rgba(115, 221, 213, 0.92)", Math.max(2, width * 0.003));
+        drawCanvasDot(ctx, startCanvas, Math.max(4.5, width * 0.006), "rgba(247, 160, 74, 0.9)");
+        drawCanvasDot(ctx, endCanvas, Math.max(4.5, width * 0.006), "rgba(247, 160, 74, 0.9)");
+        drawCanvasDot(ctx, movedStartCanvas, Math.max(4.5, width * 0.006), "rgba(115, 221, 213, 0.92)");
+        drawCanvasDot(ctx, movedEndCanvas, Math.max(4.5, width * 0.006), "rgba(115, 221, 213, 0.92)");
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
+        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["same offset after relocation"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
+      }
+
+      function drawDirectionPanel(rect) {
+        const extentX = 2.9;
+        const extentY = 2.4;
+        drawLessonCanvasPanel(ctx, rect, "Direction: orientation only", width);
+        drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        const anchorACanvas = projectRectPoint(rect, directionAnchorA, extentX, extentY);
+        const anchorBCanvas = projectRectPoint(rect, directionAnchorB, extentX, extentY);
+        const tipACanvas = projectRectPoint(rect, add2(directionAnchorA, directionVector), extentX, extentY);
+        const tipBCanvas = projectRectPoint(rect, add2(directionAnchorB, directionVector), extentX, extentY);
+
+        ctx.setLineDash([8, 6]);
+        drawArrow2d(ctx, anchorACanvas, anchorBCanvas, "rgba(255, 223, 132, 0.8)", Math.max(1.6, width * 0.0026));
+        ctx.setLineDash([]);
+
+        drawArrow2d(ctx, anchorACanvas, tipACanvas, "rgba(247, 160, 74, 0.88)", Math.max(2.1, width * 0.003));
+        drawArrow2d(ctx, anchorBCanvas, tipBCanvas, "rgba(115, 221, 213, 0.94)", Math.max(2.1, width * 0.003));
+        drawCanvasDot(ctx, anchorACanvas, Math.max(4, width * 0.0055), "rgba(247, 160, 74, 0.9)");
+        drawCanvasDot(ctx, anchorBCanvas, Math.max(4, width * 0.0055), "rgba(115, 221, 213, 0.9)");
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
+        ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+        drawTextLines(ctx, ["same direction, new anchor"], rect.x + 14, rect.y + rect.height - 22, Math.max(12, width * 0.012 * 1.24), rect.width - 28);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawPointPanel(rects[0]);
+      drawOffsetPanel(rects[1]);
+      drawDirectionPanel(rects[2]);
+    },
+  });
+}
+
+function setupGameVectorsStoryDemo() {
+  const canvas = document.getElementById("game-vectors-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.18 : time * 0.84;
+      const arenaRect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 4.1;
+      const extentY = 3.1;
+      const player = [
+        -1.28 + Math.cos(phase * 0.82) * 0.62,
+        -0.18 + Math.sin(phase * 0.97) * 0.4,
+      ];
+      const velocityRaw = [
+        -Math.sin(phase * 0.82) * 0.62 * 0.82,
+        Math.cos(phase * 0.97) * 0.4 * 0.97,
+      ];
+      const moveDir = normalize2(velocityRaw);
+      const velocity = scale2(moveDir, 1.14 + (0.5 + Math.sin(phase * 1.1) * 0.5) * 0.36);
+      const nextPoint = add2(player, scale2(velocity, 0.34));
+      const enemyBase = [
+        1.52 + Math.cos(phase * 0.44) * 0.18,
+        0.82 + Math.sin(phase * 0.62) * 0.24,
+      ];
+      const toEnemy = subtract2(enemyBase, player);
+      const aimDir = normalize2(toEnemy);
+      const shotCycle = prefersReducedMotion ? 0.52 : (time * 0.92) % 1;
+      const knockbackStrength = shotCycle > 0.82 ? (shotCycle - 0.82) / 0.18 : 0;
+      const knockback = scale2(aimDir, Math.min(1, knockbackStrength) * 0.26);
+      const enemy = add2(enemyBase, knockback);
+      const projectileStart = add2(player, scale2(aimDir, 0.4));
+      const projectileTravel = Math.max(Math.hypot(toEnemy[0], toEnemy[1]) - 0.65, 0.2);
+      const projectile = add2(projectileStart, scale2(aimDir, projectileTravel * Math.min(shotCycle * 1.18, 1)));
+      const arrowTipAim = add2(player, scale2(aimDir, 1.35));
+      const arrowTipVelocity = add2(player, scale2(velocity, 0.72));
+      const obstacleRects = [
+        { min: [-0.05, -1.42], max: [0.92, -0.84] },
+        { min: [-0.64, 1.02], max: [0.28, 1.5] },
+      ];
+
+      function toArena(point) {
+        return projectRectPoint(arenaRect, point, extentX, extentY, 18, 22, 0.58);
+      }
+
+      function drawObstacle(rect) {
+        const topLeft = toArena([rect.min[0], rect.max[1]]);
+        const bottomRight = toArena([rect.max[0], rect.min[1]]);
+        ctx.fillStyle = "rgba(8, 18, 26, 0.38)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.lineWidth = 1;
+        ctx.fillRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+        ctx.strokeRect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+      }
+
+      function drawLabel(text, point, side = "right") {
+        ctx.save();
+        ctx.font = `${Math.max(10, width * 0.0118)}px "Avenir Next", "Segoe UI", sans-serif`;
+        ctx.textAlign = "left";
+        const lines = wrapCanvasTextLine(ctx, text, 120);
+        const lineHeight = Math.max(12, width * 0.0118 * 1.24);
+        const maxWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
+        const x = side === "left" ? point[0] - maxWidth - 14 : point[0] + 8;
+        const y = point[1] - lineHeight * lines.length * 0.5 - 3;
+        ctx.fillStyle = "rgba(8, 21, 30, 0.72)";
+        ctx.fillRect(x - 6, y - 4, maxWidth + 12, lineHeight * lines.length + 8);
+        ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+        drawTextLines(ctx, lines, x, y, lineHeight, 120);
+        ctx.restore();
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawLessonCanvasPanel(ctx, arenaRect, "Top-down game: vectors in motion", width);
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let x = -4; x <= 4; x += 1) {
+        const start = toArena([x, -extentY]);
+        const end = toArena([x, extentY]);
+        ctx.beginPath();
+        ctx.moveTo(start[0], start[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.stroke();
+      }
+      for (let y = -3; y <= 3; y += 1) {
+        const start = toArena([-extentX, y]);
+        const end = toArena([extentX, y]);
+        ctx.beginPath();
+        ctx.moveTo(start[0], start[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.stroke();
+      }
+
+      for (const rect of obstacleRects) {
+        drawObstacle(rect);
+      }
+
+      ctx.strokeStyle = "rgba(115, 221, 213, 0.18)";
+      ctx.lineWidth = Math.max(1.6, width * 0.0024);
+      ctx.beginPath();
+      for (let step = 0; step <= 24; step += 1) {
+        const samplePhase = phase - (24 - step) * 0.12;
+        const samplePoint = [
+          -1.28 + Math.cos(samplePhase * 0.82) * 0.62,
+          -0.18 + Math.sin(samplePhase * 0.97) * 0.4,
+        ];
+        const projected = toArena(samplePoint);
+        if (step === 0) {
+          ctx.moveTo(projected[0], projected[1]);
+        } else {
+          ctx.lineTo(projected[0], projected[1]);
+        }
+      }
+      ctx.stroke();
+
+      const playerCanvas = toArena(player);
+      const nextCanvas = toArena(nextPoint);
+      const enemyCanvas = toArena(enemy);
+      const enemyBaseCanvas = toArena(enemyBase);
+      const projectileCanvas = toArena(projectile);
+      const velocityCanvas = toArena(arrowTipVelocity);
+      const aimCanvas = toArena(arrowTipAim);
+
+      ctx.setLineDash([8, 6]);
+      drawArrow2d(ctx, playerCanvas, enemyCanvas, "rgba(255, 223, 132, 0.82)", Math.max(1.8, width * 0.0028));
+      ctx.setLineDash([]);
+      drawArrow2d(ctx, playerCanvas, velocityCanvas, "rgba(247, 160, 74, 0.95)", Math.max(2.4, width * 0.0032));
+      drawArrow2d(ctx, playerCanvas, aimCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2.3, width * 0.0032));
+
+      if (knockbackStrength > 0) {
+        drawArrow2d(ctx, enemyBaseCanvas, enemyCanvas, "rgba(255, 154, 102, 0.94)", Math.max(2, width * 0.003));
+      }
+
+      drawCanvasDot(
+        ctx,
+        nextCanvas,
+        Math.max(8, width * 0.0092),
+        "rgba(255, 255, 255, 0.08)",
+        "rgba(255, 255, 255, 0.22)",
+        Math.max(1.4, width * 0.0022)
+      );
+      drawCanvasDot(ctx, playerCanvas, Math.max(9, width * 0.0104), "rgba(247, 160, 74, 0.96)", "rgba(255, 245, 216, 0.98)", Math.max(1.8, width * 0.0026));
+      drawCanvasDot(ctx, enemyCanvas, Math.max(10, width * 0.011), "rgba(115, 221, 213, 0.92)", "rgba(214, 248, 245, 0.96)", Math.max(1.8, width * 0.0026));
+      drawCanvasDot(ctx, projectileCanvas, Math.max(4.8, width * 0.0062), "rgba(255, 245, 216, 0.98)");
+
+      drawLabel("playerPos", playerCanvas);
+      drawLabel("enemyPos", enemyCanvas, "left");
+      drawLabel("velocity", velocityCanvas);
+      drawLabel("aimDir", aimCanvas);
+      drawLabel("enemy - player", [
+        (playerCanvas[0] + enemyCanvas[0]) * 0.5,
+        (playerCanvas[1] + enemyCanvas[1]) * 0.5 - 10,
+      ]);
+      if (knockbackStrength > 0.1) {
+        drawLabel("knockback", enemyCanvas);
+      }
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.88)";
+      ctx.font = `${Math.max(10, width * 0.0114)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
+      drawTextLines(
+        ctx,
+        [
+          `velocity = ${formatVector(velocity, 2)}`,
+          `toEnemy = ${formatVector(toEnemy, 2)}`,
+          `playerPos += velocity * dt`,
+        ],
+        arenaRect.x + 16,
+        arenaRect.y + arenaRect.height - Math.max(62, width * 0.06),
+        Math.max(12, width * 0.0114 * 1.26),
+        220
+      );
+    },
+  });
+}
+
+function setupMatrixColumnsDemo() {
+  const canvas = document.getElementById("matrix-columns-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const unitSquare = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.15 : time * 0.76;
+      const angle = 0.32 + Math.sin(phase * 0.66) * 0.42;
+      const scaleX = 1.04 + Math.sin(phase * 1.12) * 0.28;
+      const scaleY = 0.9 + Math.cos(phase * 0.82) * 0.2;
+      const shear = Math.sin(phase * 0.58) * 0.38;
+      const basisI = [Math.cos(angle) * scaleX * 1.12, Math.sin(angle) * scaleX * 1.12];
+      const basisJ = [-Math.sin(angle) * scaleY + shear * 0.46, Math.cos(angle) * scaleY];
+      const parallelogram = unitSquare.map((point) => add2(scale2(basisI, point[0]), scale2(basisJ, point[1])));
+      const stacked = width < 780;
+      const margin = 18;
+      const gap = 16;
+      const plotRect = stacked
+        ? { x: margin, y: margin, width: width - margin * 2, height: height * 0.62 - margin }
+        : { x: margin, y: margin, width: width * 0.62 - margin - gap * 0.5, height: height - margin * 2 };
+      const infoRect = stacked
+        ? { x: margin, y: plotRect.y + plotRect.height + gap, width: width - margin * 2, height: height - plotRect.height - margin * 2 - gap }
+        : { x: plotRect.x + plotRect.width + gap, y: margin, width: width - plotRect.width - margin * 2 - gap, height: height - margin * 2 };
+      const extentX = 2.7;
+      const extentY = 2.5;
+
+      function drawPolygon(points, fillStyle, strokeStyle) {
+        ctx.beginPath();
+        for (let index = 0; index < points.length; index += 1) {
+          const projected = projectRectPoint(plotRect, points[index], extentX, extentY);
+          if (index === 0) {
+            ctx.moveTo(projected[0], projected[1]);
+          } else {
+            ctx.lineTo(projected[0], projected[1]);
+          }
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = Math.max(1.8, width * 0.0028);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+
+      drawLessonCanvasPanel(ctx, plotRect, "Columns become basis directions", width);
+      drawRectAxesGrid(ctx, plotRect, extentX, extentY, width);
+      drawPolygon(unitSquare, "rgba(255, 255, 255, 0.05)", "rgba(255, 255, 255, 0.18)");
+      drawPolygon(parallelogram, "rgba(115, 221, 213, 0.22)", "rgba(115, 221, 213, 0.92)");
+
+      const origin = projectRectPoint(plotRect, [0, 0], extentX, extentY);
+      const basisICanvas = projectRectPoint(plotRect, basisI, extentX, extentY);
+      const basisJCanvas = projectRectPoint(plotRect, basisJ, extentX, extentY);
+      const cornerCanvas = projectRectPoint(plotRect, add2(basisI, basisJ), extentX, extentY);
+      drawArrow2d(ctx, origin, basisICanvas, "rgba(247, 160, 74, 0.95)", Math.max(2.4, width * 0.0032));
+      drawArrow2d(ctx, origin, basisJCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2.4, width * 0.0032));
+      drawCanvasDot(ctx, basisICanvas, Math.max(5.5, width * 0.0066), "rgba(247, 160, 74, 0.96)");
+      drawCanvasDot(ctx, basisJCanvas, Math.max(5.5, width * 0.0066), "rgba(115, 221, 213, 0.96)");
+      drawCanvasDot(ctx, cornerCanvas, Math.max(6.5, width * 0.0076), "rgba(255, 245, 216, 0.96)");
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.92)";
+      ctx.font = `${Math.max(10, width * 0.012)}px "Avenir Next", "Segoe UI", sans-serif`;
+      ctx.fillText("column 1", basisICanvas[0] + 10, basisICanvas[1] - 10);
+      ctx.fillText("column 2", basisJCanvas[0] + 10, basisJCanvas[1] - 10);
+      ctx.fillText("(1, 1) = column 1 + column 2", cornerCanvas[0] + 12, cornerCanvas[1] - 10);
+
+      drawLessonCanvasPanel(ctx, infoRect, "Read the multiplication", width);
+      ctx.fillStyle = "rgba(239, 245, 247, 0.94)";
+      ctx.font = `${Math.max(12, width * 0.015)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
+      drawTextLines(
+        ctx,
+        [
+          `M = [ ${formatNumber(basisI[0], 2)}  ${formatNumber(basisJ[0], 2)} ]`,
+          `    [ ${formatNumber(basisI[1], 2)}  ${formatNumber(basisJ[1], 2)} ]`,
+          "",
+          `M * (1, 0) = ${formatVector(basisI, 2)}`,
+          `M * (0, 1) = ${formatVector(basisJ, 2)}`,
+          `M * (1, 1) = ${formatVector(add2(basisI, basisJ), 2)}`,
+        ],
+        infoRect.x + 16,
+        infoRect.y + 38,
+        Math.max(15, width * 0.0145 * 1.3),
+        infoRect.width - 32
+      );
+
+      ctx.fillStyle = "rgba(239, 245, 247, 0.82)";
+      ctx.font = `${Math.max(10, width * 0.0118)}px "Avenir Next", "Segoe UI", sans-serif`;
+      drawTextLines(
+        ctx,
+        ["The columns are the new local axes.", "The unit square follows those axes into the transformed shape."],
+        infoRect.x + 16,
+        infoRect.y + infoRect.height - Math.max(64, width * 0.07),
+        Math.max(13, width * 0.0128 * 1.34),
+        infoRect.width - 32
+      );
+    },
+  });
+}
+
+function setupAffineStoryDemo() {
+  const canvas = document.getElementById("affine-story-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const triangle = [
+    [-0.88, -0.56],
+    [0.96, -0.2],
+    [-0.18, 0.92],
+  ];
+  const samplePoint = [0.72, 0.34];
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.12 : time * 0.78;
+      const angle = 0.26 + Math.sin(phase * 0.74) * 0.44;
+      const scaleX = 1 + Math.sin(phase * 0.98) * 0.24;
+      const scaleY = 0.86 + Math.cos(phase * 0.88) * 0.18;
+      const translation = [0.96 + Math.sin(phase * 0.62) * 0.24, -0.52 + Math.cos(phase * 0.54) * 0.18];
+      const basisI = [Math.cos(angle) * scaleX * 1.08, Math.sin(angle) * scaleX * 1.08];
+      const basisJ = [-Math.sin(angle) * scaleY, Math.cos(angle) * scaleY];
+      const linearTransform = (point) => add2(scale2(basisI, point[0]), scale2(basisJ, point[1]));
+      const linearTriangle = triangle.map(linearTransform);
+      const affineTriangle = linearTriangle.map((point) => add2(point, translation));
+      const linearPoint = linearTransform(samplePoint);
+      const affinePoint = add2(linearPoint, translation);
+      const margin = 18;
+      const gap = 16;
+      const stacked = width < 760;
+      const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap) / 2;
+      const panelHeight = stacked ? (height - margin * 2 - gap) / 2 : height - margin * 2;
+      const linearRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const affineRect = stacked
+        ? { x: margin, y: margin + panelHeight + gap, width: panelWidth, height: panelHeight }
+        : { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const extentX = 3.1;
+      const extentY = 2.6;
+
+      function drawPolygon(rect, points, fillStyle, strokeStyle, lineWidth) {
+        ctx.beginPath();
+        for (let index = 0; index < points.length; index += 1) {
+          const projected = projectRectPoint(rect, points[index], extentX, extentY);
+          if (index === 0) {
+            ctx.moveTo(projected[0], projected[1]);
+          } else {
+            ctx.lineTo(projected[0], projected[1]);
+          }
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawPanel(rect, title, showTranslation) {
+        drawLessonCanvasPanel(ctx, rect, title, width);
+        const origin = drawRectAxesGrid(ctx, rect, extentX, extentY, width);
+        drawPolygon(rect, triangle, "rgba(255, 255, 255, 0.05)", "rgba(255, 255, 255, 0.16)", Math.max(1.4, width * 0.0024));
+        drawPolygon(
+          rect,
+          showTranslation ? affineTriangle : linearTriangle,
+          showTranslation ? "rgba(247, 160, 74, 0.2)" : "rgba(115, 221, 213, 0.2)",
+          showTranslation ? "rgba(247, 160, 74, 0.92)" : "rgba(115, 221, 213, 0.92)",
+          Math.max(2, width * 0.003)
+        );
+
+        const transformedOrigin = showTranslation ? projectRectPoint(rect, translation, extentX, extentY) : origin;
+        const transformedPoint = projectRectPoint(rect, showTranslation ? affinePoint : linearPoint, extentX, extentY);
+        if (showTranslation) {
+          ctx.setLineDash([8, 6]);
+          drawArrow2d(ctx, origin, transformedOrigin, "rgba(255, 223, 132, 0.9)", Math.max(1.8, width * 0.0028));
+          ctx.setLineDash([]);
+          drawCanvasDot(ctx, transformedOrigin, Math.max(5, width * 0.0065), "rgba(255, 223, 132, 0.94)");
+        }
+
+        drawCanvasDot(
+          ctx,
+          transformedPoint,
+          Math.max(6, width * 0.0076),
+          showTranslation ? "rgba(247, 160, 74, 0.96)" : "rgba(115, 221, 213, 0.96)"
+        );
+
+        ctx.fillStyle = "rgba(239, 245, 247, 0.86)";
+        ctx.font = `${Math.max(10, width * 0.012)}px "SFMono-Regular", "Menlo", "Consolas", monospace`;
+        ctx.fillText(showTranslation ? "A * 0 + t = t" : "A * 0 = 0", rect.x + 14, rect.y + rect.height - 16);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height);
+      drawPanel(linearRect, "Linear only", false);
+      drawPanel(affineRect, "Linear plus translation", true);
     },
   });
 }
@@ -11936,6 +13257,10 @@ function initialize() {
   setupHeaderOffset();
   setupReveals();
   safeSetup("hero-canvas", setupHeroDemo);
+  safeSetup("foundation-types-canvas", setupFoundationTypesDemo);
+  safeSetup("game-vectors-canvas", setupGameVectorsStoryDemo);
+  safeSetup("matrix-columns-canvas", setupMatrixColumnsDemo);
+  safeSetup("affine-story-canvas", setupAffineStoryDemo);
   safeSetup("basis-story-canvas", setupBasisStoryDemo);
   safeSetup("homogeneous-story-canvas", setupHomogeneousStoryDemo);
   safeSetup("order-story-canvas", setupOrderStoryDemo);
@@ -11943,8 +13268,13 @@ function initialize() {
   safeSetup("space-object-canvas", setupSpaceObjectDemo);
   safeSetup("space-world-canvas", setupSpaceWorldDemo);
   safeSetup("space-clip-canvas", setupSpaceClipDemo);
+  safeSetup("space-contract-canvas", setupSpaceContractDemo);
+  safeSetup("game-spaces-canvas", setupGameSpacesStoryDemo);
+  safeSetup("camera-frame-canvas", setupCameraFrameStoryDemo);
+  safeSetup("worked-example-canvas", setupWorkedExampleStoryDemo);
   safeSetup("space-map-canvas", setupSpaceMapStoryDemo);
   safeSetup("clip-story-canvas", setupClipStoryDemo);
+  safeSetup("game-normals-canvas", setupGameNormalsStoryDemo);
   safeSetup("normals-canvas", setupNormalsDemo);
   safeSetup("shader-canvas", setupShaderDemo);
   safeSetup("shader-fluid-canvas", setupShaderFluidDemo);

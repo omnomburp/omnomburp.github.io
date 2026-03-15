@@ -46,6 +46,7 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#game-lighting">Game intuition</a>
             <a href="#mental-model">Mental model</a>
             <a href="#lighting-logic">Lighting logic</a>
             <a href="#lab">Live lab</a>
@@ -98,6 +99,77 @@
               <span class="formula-label">Facing away</span>
               <code>dot(n, l) &lt;= 0</code>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-lighting">
+          <div class="section-header">
+            <p class="eyebrow">Game Intuition</p>
+            <h2>A flashlight sliding across armor is a normal-direction story</h2>
+            <p>
+              In a game, a shield, helmet, wall, or character shoulder can stay in the same place while its brightness
+              changes dramatically. The missing ingredient is usually the surface normal, not a mystery light rule.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="game-normals-canvas" class="canvas-stage" aria-label="Game flashlight normals explainer"></canvas>
+            <p class="canvas-caption">A moving flashlight hits a curved shield. The highlighted point changes brightness because the local normal and incoming light direction align differently over time.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Surface normal</h3>
+              <p>The white arrow shows which way that tiny patch of armor is facing.</p>
+              <code>n</code>
+            </article>
+            <article class="readout-card">
+              <h3>Light direction</h3>
+              <p>The orange arrow points from the surface point toward the flashlight.</p>
+              <code>l</code>
+            </article>
+            <article class="readout-card">
+              <h3>Alignment test</h3>
+              <p>The brighter patch is the one whose normal lines up best with the light.</p>
+              <code>dot(n, l)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Game effect</h3>
+              <p>This is why a curved surface gets a moving highlight instead of one flat brightness value.</p>
+              <code>diffuse = max(dot(n, l), 0)</code>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>The flashlight is not asking “where is the shield?”</h3>
+                <p>It already knows where the surface point is. The shading question is which way that point is facing.</p>
+              </li>
+              <li>
+                <h3>Different points on the same object can face the light differently</h3>
+                <p>That is why a round shield or shoulder pad gets a bright hotspot that slides instead of one uniform color.</p>
+              </li>
+              <li>
+                <h3>The normal changes the answer even when the light stays fixed</h3>
+                <p>Move to a different patch on the curved surface and the angle to the flashlight changes, so the diffuse term changes too.</p>
+              </li>
+              <li>
+                <h3>This same rule drives many game materials</h3>
+                <p>Characters, props, terrain, and walls all start from this same normal-versus-light alignment test before more advanced shading layers are added.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Useful debug habit</h3>
+                <p>If a highlight appears in the wrong place on a model, check the normals before tweaking light intensity or material values.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why chapter 3 matters</h3>
+                <p>Once this picture is clear, shader code stops looking like mysterious dot-product folklore and starts reading like visible geometry logic.</p>
+              </article>
+            </div>
           </div>
         </section>
 

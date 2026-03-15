@@ -46,9 +46,13 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#space-contract">Space contract</a>
+            <a href="#game-spaces">Game intuition</a>
             <a href="#mental-model">Mental model</a>
             <a href="#space-map">Where transforms act</a>
+            <a href="#camera-frame">View matrix</a>
             <a href="#clip-space">Clip space</a>
+            <a href="#worked-example">Worked example</a>
             <a href="#journey">Vertex journey</a>
             <a href="#lab">Live lab</a>
             <a href="#stage-reader">Pipeline reader</a>
@@ -104,10 +108,148 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="space-contract">
+          <div class="section-header">
+            <p class="eyebrow">Space Contract</p>
+            <h2>A position without its space is only half a variable name</h2>
+            <p>
+              In graphics, coordinates behave like typed data. The tuple is the value, and the current space is the
+              type. Dropping the space name is like dropping units from a physics equation.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="space-contract-canvas" class="canvas-stage" aria-label="Coordinate spaces as contracts explainer"></canvas>
+            <p class="canvas-caption">The same geometric vertex is rewritten under different space contracts, so the numbers can change meaning even before the shape changes.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Object position</h3>
+              <p><code>(1, 0, 0)</code> means “one local unit along the model’s x-axis.”</p>
+            </article>
+            <article class="readout-card">
+              <h3>World position</h3>
+              <p>The same numbers now mean “one world unit from the global origin,” which can be a completely different place.</p>
+            </article>
+            <article class="readout-card">
+              <h3>View position</h3>
+              <p>Now the camera is the reference frame. Left, right, near, and far are camera-relative.</p>
+            </article>
+            <article class="readout-card">
+              <h3>Clip position</h3>
+              <p>After projection the values are no longer ordinary scene distances. They are homogeneous pre-divide coordinates used for clipping.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Same vertex, new description</h3>
+                <p>The GPU is not inventing four different vertices. It is rewriting the same geometric point so each stage can do its own job.</p>
+              </li>
+              <li>
+                <h3>Each transform has an input contract</h3>
+                <p>The model matrix expects object-space input. The view matrix expects world-space input. The projection matrix expects view-space input.</p>
+              </li>
+              <li>
+                <h3>Most graphics bugs are really space-mismatch bugs</h3>
+                <p>If lighting, culling, or projection code receives data from the wrong space, the numbers can still look plausible while the picture is wrong.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Treat spaces like units</h3>
+                <p>A world-space normal and a view-space normal are as meaningfully different as meters and inches. Both may be valid, but you cannot silently swap them.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why chapter 2 matters so much</h3>
+                <p>Shading, cameras, culling, and rasterization all assume you know which space a value currently lives in. That assumption starts here.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-spaces">
+          <div class="section-header">
+            <p class="eyebrow">Game Intuition</p>
+            <h2>A chase camera is a coordinate-space machine running every frame</h2>
+            <p>
+              In a game, the same ship or player can be described in several useful ways at once: local model
+              coordinates for the mesh, world coordinates for the level, and camera-relative coordinates for rendering.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="game-spaces-canvas" class="canvas-stage" aria-label="Game camera coordinate spaces explainer"></canvas>
+            <p class="canvas-caption">Left: the ship in local model space. Middle: the same ship placed into the arena. Right: the same arena rewritten relative to the chase camera.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Model-local mesh</h3>
+              <p>The ship is easiest to define around its own pivot before the level matters.</p>
+              <code>shipLocal</code>
+            </article>
+            <article class="readout-card">
+              <h3>World placement</h3>
+              <p>The same ship gets one position and facing inside the shared arena.</p>
+              <code>shipWorld = M * shipLocal</code>
+            </article>
+            <article class="readout-card">
+              <h3>Camera-relative view</h3>
+              <p>Subtract the camera pose and rewrite the scene around the chase camera.</p>
+              <code>pickupView = V * pickupWorld</code>
+            </article>
+            <article class="readout-card">
+              <h3>Next step</h3>
+              <p>Only after the camera-relative rewrite does projection prepare the final screen mapping.</p>
+              <code>screen = project(view)</code>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Object space is where the asset is authored</h3>
+                <p>The ship mesh sits around its own origin so rotating, animating, and attaching effects remain simple.</p>
+              </li>
+              <li>
+                <h3>World space is where gameplay happens</h3>
+                <p>The chase camera, pickups, and enemies all need shared positions before the game can reason about distance and collision.</p>
+              </li>
+              <li>
+                <h3>View space rewrites the arena around the camera</h3>
+                <p>The camera is easier to render from once the whole world is expressed relative to its frame.</p>
+              </li>
+              <li>
+                <h3>The same object survives every rewrite</h3>
+                <p>The ship is not duplicated three times. Only its description changes from local, to world, to camera-relative coordinates.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Useful game habit</h3>
+                <p>If an object renders in the wrong place, ask whether the bug happened before or after the camera rewrite instead of treating the full pipeline as one step.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why this matters beyond games</h3>
+                <p>The same coordinate bookkeeping shows up in CAD viewers, simulations, map tools, and any other 3D renderer with a camera.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="mental-model">
           <div class="section-header">
             <p class="eyebrow">Mental model</p>
             <h2>Each space exists because it makes one transformation problem easier</h2>
+            <p>
+              Instead of asking “why are there so many spaces?”, ask “what job becomes easier in this space?” The
+              pipeline is a sequence of coordinate systems chosen for convenience, not a sequence of arbitrary math tricks.
+            </p>
           </div>
 
           <div class="step-grid">
@@ -188,6 +330,54 @@
                   </article>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="camera-frame">
+          <div class="section-header">
+            <p class="eyebrow">View Matrix</p>
+            <h2>The camera is easier to reason about once the world is rewritten around it</h2>
+            <p>
+              Beginners often imagine the view matrix as “moving the camera forward.” In math terms it does the
+              opposite: it rewrites world-space points so the camera behaves like the origin looking down its forward axis.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="camera-frame-canvas" class="canvas-stage" aria-label="View matrix camera frame explainer"></canvas>
+            <p class="canvas-caption">In world space the camera has a pose. In view space the eye is fixed and the world moves inversely around it.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Start from a camera pose in world space</h3>
+                <p>The camera has a position and orientation just like any other object in the scene.</p>
+              </li>
+              <li>
+                <h3>Invert that pose to build the view matrix</h3>
+                <p>If the camera moved right in world space, the view transform makes the whole world appear to move left instead.</p>
+              </li>
+              <li>
+                <h3>After the rewrite, the eye is at the origin</h3>
+                <p>That makes projection easier because the visible volume can now be defined relative to one fixed camera frame.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="formula-card">
+                <span class="formula-label">Camera pose</span>
+                <code>cameraPose</code>
+              </article>
+              <article class="formula-card">
+                <span class="formula-label">View matrix</span>
+                <code>V = inverse(cameraPose)</code>
+              </article>
+              <article class="mini-card">
+                <h3>Practical reading</h3>
+                <p>Do not memorize “the camera moves.” Read it as “world data is being re-expressed in camera-relative coordinates.”</p>
+              </article>
             </div>
           </div>
         </section>
@@ -291,6 +481,58 @@
                   </article>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="worked-example">
+          <div class="section-header">
+            <p class="eyebrow">Worked Example</p>
+            <h2>Track one concrete vertex and notice what changes at each rewrite</h2>
+            <p>
+              A beginner-friendly way to read the pipeline is to keep one vertex in mind and narrate what each stage
+              changes: reference frame, not identity.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="worked-example-canvas" class="canvas-stage" aria-label="Worked vertex journey explainer"></canvas>
+            <p class="canvas-caption">One highlighted vertex keeps its identity while its coordinates are rewritten through object, world, view, clip, and NDC stages.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Object space: a corner of the model</h3>
+                <p><code>p_object = (1, 0, 0, 1)</code> means “one local unit along the model’s x-axis.”</p>
+              </li>
+              <li>
+                <h3>World space: same corner, now placed in the scene</h3>
+                <p>After a model transform, that corner might become <code>p_world = (4, 1, -5, 1)</code>. The vertex did not change identity; only the frame used to describe it changed.</p>
+              </li>
+              <li>
+                <h3>View space: same corner relative to the camera</h3>
+                <p>If the camera is only translated to <code>(2, 0, 3)</code> in world space, the same point can become <code>p_view = (2, 1, -8, 1)</code> after the view rewrite.</p>
+              </li>
+              <li>
+                <h3>Clip and NDC: same corner prepared for visibility and screen mapping</h3>
+                <p>Projection turns the view-space point into <code>p_clip</code>. Dividing by <code>w</code> turns that into <code>p_ndc</code>, which the viewport can finally map to pixels.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <pre class="code-block code-block-compact"><code>p_object -> M -> p_world
+p_world  -> V -> p_view
+p_view   -> P -> p_clip
+p_clip   -> /w -> p_ndc</code></pre>
+              <article class="mini-card">
+                <h3>What stays constant</h3>
+                <p>It is still the same vertex on the same triangle. The numbers change because the coordinate system changes.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why beginners get lost</h3>
+                <p>If you collapse all four readouts into the single word “position,” you erase the main information needed to debug the pipeline.</p>
+              </article>
             </div>
           </div>
         </section>

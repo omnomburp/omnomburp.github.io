@@ -46,8 +46,12 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#foundations">Foundations</a>
+            <a href="#game-vectors">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#matrix-reading">Read a matrix</a>
             <a href="#rebuild">Rebuild a point</a>
+            <a href="#affine">Affine bridge</a>
             <a href="#walkthrough">Translation and w</a>
             <a href="#order-matters">Order matters</a>
             <a href="#lab">Live lab</a>
@@ -107,6 +111,136 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="foundations">
+          <div class="section-header">
+            <p class="eyebrow">Foundations</p>
+            <h2>Separate locations, offsets, and directions before you touch matrices</h2>
+            <p>
+              Graphics reuses the same tuple syntax for several different geometric meanings. That is why the math can
+              feel slippery at first. The numbers matter, but the thing those numbers describe matters just as much.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="foundation-types-canvas" class="canvas-stage" aria-label="Point, offset, and direction explainer"></canvas>
+            <p class="canvas-caption">A point owns a location, an offset spans between points, and a direction keeps orientation without owning one fixed position.</p>
+          </article>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Point</h2>
+              <p>A point answers “where is it?” In a game, <code>playerPos</code> is a point, so translation should move it.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Offset vector</h2>
+              <p>An offset answers “how do I get from one point to another?” In a game, <code>enemyPos - playerPos</code> is that kind of arrow.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Direction</h2>
+              <p>A direction answers “which way?” In a game, the stick direction or aim direction should not gain a new location just because the player moved.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>A point and a direction can share the same raw numbers</h3>
+                <p><code>(1, 0, 0)</code> could mean “the point one unit along x from the origin” or “the direction pointing along x.” The tuple alone does not settle that meaning.</p>
+              </li>
+              <li>
+                <h3>Subtracting two points gives an offset</h3>
+                <p>If <code>B - A</code> points from one location to another, the result is a reusable offset. It is not tied to one absolute origin the way a point is.</p>
+              </li>
+              <li>
+                <h3>This distinction is why homogeneous coordinates appear later</h3>
+                <p>When we add <code>w</code>, we are not inventing a random extra number. We are giving the pipeline a way to tell “location” apart from “pure direction.”</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Good habit</h3>
+                <p>When you read a graphics value, ask “is this a point, an offset, or a direction?” before you ask what its numbers are.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why chapter 1 slows down here</h3>
+                <p>If these meanings blur together now, later topics like normals, camera transforms, and lighting will feel arbitrary even when the code is correct.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-vectors">
+          <div class="section-header">
+            <p class="eyebrow">Game Intuition</p>
+            <h2>Vectors already run a top-down game even if the engine hides the math</h2>
+            <p>
+              Move a character, aim at an enemy, launch a projectile, or apply knockback and you are already using
+              vectors. Games are one of the clearest places to see what each vector means in motion.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="game-vectors-canvas" class="canvas-stage" aria-label="Top-down game vector explainer"></canvas>
+            <p class="canvas-caption">The player marker is a point. The orange arrow is velocity. The cyan arrow is aim direction. The dashed arrow to the enemy is the offset vector built from subtraction.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Player point</h3>
+              <p>The character’s current map location is a point.</p>
+              <code>playerPos</code>
+            </article>
+            <article class="readout-card">
+              <h3>Movement vector</h3>
+              <p>The stick picks a direction, then speed gives that direction a length.</p>
+              <code>velocity = moveDir * speed</code>
+            </article>
+            <article class="readout-card">
+              <h3>Target offset</h3>
+              <p>Subtract two points to get the arrow from one actor to another.</p>
+              <code>toEnemy = enemyPos - playerPos</code>
+            </article>
+            <article class="readout-card">
+              <h3>Frame update</h3>
+              <p>Move the point by adding this frame’s displacement.</p>
+              <code>playerPos += velocity * dt</code>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>The player marker is a point in the world</h3>
+                <p>The circle has one location. That makes it a point, not just a free-floating arrow.</p>
+              </li>
+              <li>
+                <h3>Velocity says how the point will change next</h3>
+                <p>The orange arrow has both direction and length, so it can mean “move this way at this speed.”</p>
+              </li>
+              <li>
+                <h3>Aim is a direction, not a location</h3>
+                <p>The cyan arrow tells the projectile which way to travel. It should rotate with the player but not inherit a second world position of its own.</p>
+              </li>
+              <li>
+                <h3>Subtract positions to get chase, aim, and knockback vectors</h3>
+                <p>The dashed arrow from player to enemy is the kind of vector a game uses for steering, targeting, and many AI behaviors.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why normalization shows up in games</h3>
+                <p>If you only want “which way?”, normalize the vector first. That removes length so the value keeps direction but not speed.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why this helps with graphics too</h3>
+                <p>The same meanings keep showing up later as light directions, view directions, camera offsets, and local basis axes.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="mental-model">
           <div class="section-header">
             <p class="eyebrow">Mental model</p>
@@ -139,6 +273,54 @@
               <h3>A matrix changes that reconstruction rule</h3>
               <p>Rotation and scale work by changing the basis itself. Translation is special enough that we will slow down and learn it next.</p>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="matrix-reading">
+          <div class="section-header">
+            <p class="eyebrow">Read A Matrix</p>
+            <h2>In graphics, the columns of a matrix are often the new basis directions</h2>
+            <p>
+              This is the jump many beginners need. A matrix is not just a box that “does multiplication.” It packs the
+              basis vectors that tell you how local coordinates are rebuilt in another frame.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="matrix-columns-canvas" class="canvas-stage" aria-label="Matrix columns as basis vectors explainer"></canvas>
+            <p class="canvas-caption">The matrix columns are the new basis directions. The unit square follows those columns into a transformed parallelogram.</p>
+          </article>
+
+          <div class="two-column">
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>First column</h3>
+                <p>It tells you where the local x-axis lands after the transform. Feed in <code>(1, 0)</code> and you recover that column.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Second column</h3>
+                <p>It tells you where the local y-axis lands. Feed in <code>(0, 1)</code> and you recover the second column.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Why this explains scale, rotation, and shear</h3>
+                <p>If those column vectors change length, angle, or perpendicularity, the rebuilt shape stretches, rotates, or shears with them.</p>
+              </article>
+            </div>
+
+            <div class="note-stack">
+              <pre class="code-block code-block-compact"><code>M = [ i'_x  j'_x ]
+    [ i'_y  j'_y ]
+
+p_local = [ x ]
+          [ y ]
+
+p_world = M p_local
+        = x i' + y j'</code></pre>
+              <article class="mini-card">
+                <h3>Beginner-friendly reading</h3>
+                <p>Matrix multiplication here means “take <code>x</code> copies of the first column and <code>y</code> copies of the second.” It is the same basis-weight story, just packed into one object.</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -196,6 +378,62 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="affine">
+          <div class="section-header">
+            <p class="eyebrow">Affine Bridge</p>
+            <h2>Linear transforms keep the origin fixed, so translation must be added as an offset</h2>
+            <p>
+              Rotation, scale, and shear are linear: they rebuild coordinates around the current origin. Translation is
+              different because it moves that origin itself.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="affine-story-canvas" class="canvas-stage" aria-label="Linear versus affine transform explainer"></canvas>
+            <p class="canvas-caption">A linear transform keeps the origin fixed. An affine transform adds translation and shifts the whole frame with it.</p>
+          </article>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Linear part</h3>
+              <p><code>A p</code> can rotate, scale, or shear a value, but it always sends the zero vector to zero.</p>
+            </article>
+            <article class="readout-card">
+              <h3>Why that matters</h3>
+              <p>If the origin stays fixed, a pure matrix multiply in ordinary coordinates cannot describe “move everything two units right.”</p>
+            </article>
+            <article class="readout-card">
+              <h3>Affine form</h3>
+              <p>An everyday object transform is usually <code>p' = A p + t</code>: a linear basis change followed by one shared offset.</p>
+            </article>
+            <article class="readout-card">
+              <h3>Homogeneous trick</h3>
+              <p>Homogeneous coordinates package that offset into the same matrix chain so the GPU can compose everything uniformly.</p>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <pre class="code-block code-block-compact"><code>linear:  p' = A p
+affine:  p' = A p + t
+
+A * 0 = 0
+
+That last line is the reason
+translation needs special treatment.</code></pre>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>What changes conceptually</h3>
+                <p>First rebuild the local value from basis directions. Then, if the value is a point, add the frame’s translation offset.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What stays the same</h3>
+                <p>The linear part can affect both points and directions. The offset should only affect points, which is exactly what <code>w</code> lets the pipeline express.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="walkthrough">
           <div class="section-header">
             <p class="eyebrow">Translation And W</p>
@@ -203,7 +441,7 @@
             <p>
               Rotation and scale can be understood as basis changes. Translation is different: it should move points,
               but it should not move pure directions. Graphics handles that by adding one extra coordinate called
-              <code>w</code>.
+              <code>w</code>, which lets one matrix chain express both the linear part and the optional translation offset.
             </p>
           </div>
 
@@ -262,7 +500,7 @@
             <p>
               This idea is easier to trust once you see it. Both panels below use the same changing scale and rotation
               values, but the highlighted corner traces a different path because the second transform always acts on the
-              result of the first.
+              result of the first. Read the chain right to left: whichever transform sits closest to the point acts first.
             </p>
           </div>
 

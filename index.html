@@ -6,7 +6,7 @@
     <title>Computer Graphics Field Guide</title>
     <meta
       name="description"
-      content="A beginner-friendly, multi-page computer graphics course with step-by-step explanations and live WebGL labs."
+      content="A beginner-friendly, multi-page computer graphics course with step-by-step explanations and interactive graphics labs."
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -40,7 +44,8 @@
             <p class="lede">
               This site is organized like a course instead of a long landing page. Start with vectors,
               move through coordinate spaces and surface normals, then continue into cameras, textures,
-              materials, shadows, ray tracing, and final image presentation. Every chapter slows down the
+              materials, shadows, ray tracing, and final image presentation before extending into transparency,
+              physically based materials, animation, and scene acceleration. Every chapter slows down the
               explanation and pairs it with an interactive lab or guided technical walkthrough.
             </p>
             <div class="action-row">
@@ -49,12 +54,12 @@
             </div>
             <div class="metric-grid" aria-label="Course highlights">
               <article class="metric-card">
-                <strong>12</strong>
+                <strong>16</strong>
                 <span>separate pages</span>
               </article>
               <article class="metric-card">
-                <strong>12</strong>
-                <span>WebGL scenes</span>
+                <strong>50</strong>
+                <span>interactive scenes</span>
               </article>
               <article class="metric-card">
                 <strong>0</strong>
@@ -68,7 +73,7 @@
             <div class="canvas-overlay">
               <article class="overlay-card">
                 <span class="overlay-tag">What the scenes teach</span>
-                <p>Transforms, cameras, sampling, lighting response, visibility, and how geometry becomes a picture.</p>
+                <p>Transforms, cameras, sampling, transparency, lighting response, animation, and how geometry becomes a picture.</p>
               </article>
               <article class="overlay-card">
                 <span class="overlay-tag">How to study</span>
@@ -82,10 +87,10 @@
       <section class="panel reveal-block" id="roadmap">
         <div class="section-header">
           <p class="eyebrow">Course roadmap</p>
-          <h2>Eleven chapters, sequenced from algebra all the way to final image polish</h2>
+          <h2>Fifteen chapters, sequenced from algebra through rendering extensions</h2>
           <p>
-            The chapters are sequenced so the intuition from one page supports the next page.
-            You can jump around later, but the first pass should be read in order.
+            Chapters 1 through 11 form the core fundamentals. Chapters 12 through 15 continue from that base into
+            compositing, modern materials, animation, and real-time scene management.
           </p>
         </div>
 
@@ -177,6 +182,38 @@
             <p class="card-note">Lab: adjust exposure and gamma and watch the displayed image respond.</p>
             <a class="card-link" href="chapter-11-color-tone-mapping-and-post-processing.html">Open Chapter 11</a>
           </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">12</span>
+            <h3>Transparency, antialiasing, and compositing</h3>
+            <p>See why translucent surfaces care about coverage, draw order, and how colors combine over a background.</p>
+            <p class="card-note">Lab: compare unsorted transparency against a correctly composited reference.</p>
+            <a class="card-link" href="chapter-12-transparency-antialiasing-and-compositing.html">Open Chapter 12</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">13</span>
+            <h3>Physically based rendering and image-based lighting</h3>
+            <p>Model roughness, metalness, and environment light so surfaces feel more consistent under changing views.</p>
+            <p class="card-note">Lab: tune a material sphere and watch the environment drive the response.</p>
+            <a class="card-link" href="chapter-13-physically-based-rendering-and-image-based-lighting.html">Open Chapter 13</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">14</span>
+            <h3>Animation, hierarchies, and skinning</h3>
+            <p>Follow transforms down a joint chain and see how vertex weights turn bones into deforming characters.</p>
+            <p class="card-note">Lab: pose a simple arm rig and compare rigid pieces with smooth skinning.</p>
+            <a class="card-link" href="chapter-14-animation-hierarchies-and-skinning.html">Open Chapter 14</a>
+          </article>
+
+          <article class="chapter-card">
+            <span class="chapter-number">15</span>
+            <h3>Acceleration, culling, and level of detail</h3>
+            <p>Reduce wasted work by drawing only what matters and simplifying distant objects before they dominate cost.</p>
+            <p class="card-note">Lab: sweep a camera through a scene and inspect visibility and LOD counts in real time.</p>
+            <a class="card-link" href="chapter-15-acceleration-culling-and-level-of-detail.html">Open Chapter 15</a>
+          </article>
         </div>
       </section>
 
@@ -212,15 +249,15 @@
           </article>
           <article class="checkpoint-card">
             <h3>Best first path</h3>
-            <p>Read Chapters 1 through 7 in order on your first pass, then use Chapters 8 through 11 as the second half of the course.</p>
+            <p>Read Chapters 1 through 7 in order on your first pass, use Chapters 8 through 11 as the core second half, then treat Chapters 12 through 15 as the advanced track.</p>
           </article>
         </div>
       </section>
     </main>
 
-    <footer class="site-footer">
-      <p>Built with plain HTML, CSS, JavaScript, and raw WebGL.</p>
-    </footer>
+	    <footer class="site-footer">
+	      <p>Built with plain HTML, CSS, JavaScript, canvas, and raw WebGL.</p>
+	    </footer>
 
     <script src="app.js"></script>
   </body>

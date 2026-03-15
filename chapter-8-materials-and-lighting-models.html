@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,10 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#response-story">Response story</a>
             <a href="#lighting-pieces">Step by step</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -126,6 +132,64 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="response-story">
+          <div class="section-header">
+            <p class="eyebrow">Response story</p>
+            <h2>Diffuse and specular are different answers to different geometric questions</h2>
+            <p>
+              At one surface point, the shader is really asking two related questions: how much the light faces the surface,
+              and whether the viewer is near the direction of a glossy reflection. Those two answers produce very different looks.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="light-response-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="light-response-canvas" class="canvas-stage canvas-stage-wide" aria-label="Diffuse versus specular response explainer"></canvas>
+                <p class="canvas-caption">The same surface point keeps one normal, but changing the light and view directions changes diffuse fill and glossy response for different reasons.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Diffuse depends on the normal and the light direction</h3>
+                    <p>When the light grazes the surface, the diffuse term falls off. When the light faces the surface more directly, the diffuse term grows.</p>
+                  </li>
+                  <li>
+                    <h3>Specular depends on the viewer as well</h3>
+                    <p>A glossy highlight only becomes strong when the eye lines up with a favored reflection direction.</p>
+                  </li>
+                  <li>
+                    <h3>The half-vector or reflection alignment controls highlight intensity</h3>
+                    <p>That is why a highlight can slide across the surface as the camera moves even when the light does not.</p>
+                  </li>
+                  <li>
+                    <h3>Shininess changes the width of the highlight</h3>
+                    <p>A low shininess value spreads the energy into a broad patch. A high value concentrates it into a tight glossy spot.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="formula-card">
+                    <span class="formula-label">Diffuse</span>
+                    <code>max(dot(n, l), 0)</code>
+                  </article>
+                  <article class="formula-card">
+                    <span class="formula-label">Specular intuition</span>
+                    <code>bright when view aligns with reflection</code>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="lighting-pieces">
           <div class="section-header">
             <p class="eyebrow">Step by step</p>
@@ -160,6 +224,10 @@
               <article class="mini-card">
                 <h3>Real materials are richer</h3>
                 <p>Physically based shading adds more accurate energy behavior, roughness handling, and material categories, but the same intuition still helps.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Do the lighting math in linear color</h3>
+                <p>If a base-color texture was authored in sRGB, decode it before combining it with diffuse or specular terms. Normal and roughness maps are already data, not display colors.</p>
               </article>
               <article class="mini-card">
                 <h3>What comes next</h3>
@@ -211,6 +279,122 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind a normal, a light, and a view direction, then inspect the diffuse and specular split</h2>
+            <p>
+              This lab turns the lighting model into editable bindings. You are choosing one surface orientation, one light
+              direction, one eye direction, and two material parameters, then watching those choices separate into diffuse and specular response.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="material-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="material-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="material-code-highlight"></code></pre>
+                  <textarea
+                    id="material-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+normal_angle = 28
+light_angle = 38
+view_angle = 12
+specular_strength = 0.48
+shininess = 36</textarea>
+                </div>
+                <p id="material-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The normal stays fixed while the lighting answer changes around it</h3>
+                <p>The arrows, response bars, and final swatch stay synchronized so you can read a highlight as a geometric condition, not an arbitrary paint effect.</p>
+              </div>
+              <canvas id="material-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Material response code lab output"></canvas>
+              <p class="code-lab-caption">Diffuse follows normal-light alignment. Specular grows when the eye lines up with the favored glossy direction.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One lighting situation and one material feel</h3>
+              <p>The bindings define where the surface faces, where the light comes from, where the viewer stands, and how sharp or strong the highlight should be.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Kill the glossy term without changing the diffuse light</h3>
+              <p>Set <code>specular_strength = 0</code>. The broad diffuse brightness should remain, but the tight highlight should disappear completely.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>Material response stops feeling like one undifferentiated brightness formula</h3>
+              <p>You can trace which part of the final look came from facing the light, which part came from view alignment, and which part came from the material settings.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Notice that changing the view angle can move the specular answer even when the light does not move.</p>
+              </div>
+              <ol id="material-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the lighting-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want to see the same idea as diffuse and specular shader terms.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="material-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Diffuse</h3>
+              <code id="material-code-readout-diffuse">0.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Specular</h3>
+              <code id="material-code-readout-specular">0.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Half vector</h3>
+              <code id="material-code-readout-half">(0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Final color</h3>
+              <code id="material-code-readout-color">rgb (0.00, 0.00, 0.00)</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -228,7 +412,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Diffuse, specular, shininess, highlight, view direction, Blinn-Phong, material response.</p>
+              <p>Diffuse, specular, shininess, highlight, view direction, linear color, Blinn-Phong, material response.</p>
             </article>
           </div>
         </section>
@@ -249,7 +433,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 8 of 11.</p>
+      <p>Chapter 8 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

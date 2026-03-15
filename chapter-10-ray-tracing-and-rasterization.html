@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a class="is-current" href="chapter-10-ray-tracing-and-rasterization.html" aria-current="page">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -46,6 +50,9 @@
             <a href="#raster">Rasterization flow</a>
             <a href="#ray">Ray tracing flow</a>
             <a href="#comparison">Comparison</a>
+            <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
+            <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
 
@@ -241,6 +248,190 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Compare a screen-space winner with the world-space ray that found it</h2>
+          </div>
+
+          <div class="lab-copy full-width-copy">
+            <p>
+              These two views share the same sample point. The left canvas behaves like an image-plane mindset: which projected shape owns this pixel?
+              The right canvas behaves like a ray-tracing mindset: which object does the viewing ray hit first, and what extra rays would you ask next?
+            </p>
+
+            <div class="controls-grid">
+              <label class="control">
+                <span>Screen sample</span>
+                <input id="compare-sample" type="range" min="10" max="90" value="48" />
+              </label>
+              <label class="control">
+                <span>Object drift</span>
+                <input id="compare-drift" type="range" min="-40" max="40" value="6" />
+              </label>
+              <label class="control control-toggle">
+                <span>Secondary rays</span>
+                <input id="compare-secondary" type="checkbox" checked />
+              </label>
+            </div>
+          </div>
+
+          <div class="two-column">
+            <article class="mini-canvas-card">
+              <h3>Rasterization view</h3>
+              <p>The pixel highlight lives on the image itself. Overlap is resolved by whichever projected surface is closer at that sample.</p>
+              <div class="canvas-card">
+                <canvas id="raster-compare-canvas" class="canvas-stage canvas-stage-compact" aria-label="Rasterization comparison demo"></canvas>
+              </div>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Ray tracing view</h3>
+              <p>The same sample launches a ray from the eye into the scene. Optional secondary rays show the extra visibility questions ray tracing can ask directly.</p>
+              <div class="canvas-card">
+                <canvas id="ray-compare-canvas" class="canvas-stage canvas-stage-compact" aria-label="Ray tracing comparison demo"></canvas>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind one screen sample, then inspect the raster winner and the matching primary ray</h2>
+            <p>
+              This lab makes the comparison editable. You are binding a screen sample position, shifting the objects slightly,
+              and deciding whether the ray-tracing view should show extra shadow and reflection queries after the first hit.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="compare-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="compare-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="compare-code-highlight"></code></pre>
+                  <textarea
+                    id="compare-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+sample = 0.48
+object_drift = 0.06
+cast_shadow = true
+cast_reflection = true</textarea>
+                </div>
+                <p id="compare-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The same sample can be told as a screen-space story or a ray story</h3>
+                <p>The image-plane view and the world-space ray view stay synchronized so you can compare what each method treats as its first-class question.</p>
+              </div>
+              <canvas id="compare-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Rasterization versus ray tracing code lab output"></canvas>
+              <p class="code-lab-caption">Rasterization resolves a screen winner. Ray tracing follows a primary ray, then optionally asks more visibility questions from the hit.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One shared sample and two rendering mindsets</h3>
+              <p>The bindings choose which screen location to inspect, how much the objects shift, and whether the ray-tracing side should reveal secondary queries after the first intersection.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Keep the same sample but hide the extra ray work</h3>
+              <p>Set <code>cast_shadow = false</code> and <code>cast_reflection = false</code>. The primary-hit story should remain, but the extra ray-tracing visibility questions should disappear.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>The two methods stop sounding like vague labels</h3>
+              <p>You can see that both methods agree on the sample owner while still organizing the work very differently: one through projected coverage, one through ray intersections.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Notice how the raster side ends at the winner while the ray side naturally invites more queries from the hit point.</p>
+              </div>
+              <ol id="compare-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the pipeline-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want to compare the same lesson bindings as raster and ray style pseudocode.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="compare-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Raster winner</h3>
+              <code id="compare-code-readout-winner">Object A</code>
+            </article>
+            <article class="readout-card">
+              <h3>Primary hit</h3>
+              <code id="compare-code-readout-hit">no hit</code>
+            </article>
+            <article class="readout-card">
+              <h3>Shadow query</h3>
+              <code id="compare-code-readout-shadow">off</code>
+            </article>
+            <article class="readout-card">
+              <h3>Reflection query</h3>
+              <code id="compare-code-readout-reflection">off</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should stay distinct in your head after this comparison</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain the same pixel using two different stories: projected coverage plus depth for rasterization, and first-hit visibility for ray tracing?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating ray tracing as if it simply “renders better.” Its strength is that visibility and secondary-light queries are built into the formulation, but they cost more.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Where to go next</h3>
+              <p>Acceleration structures, path tracing, denoising, screen-space techniques, and hybrid renderers are the natural follow-up topics.</p>
+            </article>
+          </div>
+        </section>
+
         <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
           <a class="page-link-card" href="chapter-9-shadows-and-visibility.html">
             <span class="page-direction">Back</span>
@@ -257,7 +448,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 10 of 11.</p>
+      <p>Chapter 10 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

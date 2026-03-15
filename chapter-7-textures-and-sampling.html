@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,11 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#sampling-story">Sampling story</a>
             <a href="#uv-walkthrough">Step by step</a>
+            <a href="#mipmap-story">Mipmap story</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -125,6 +132,64 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="sampling-story">
+          <div class="section-header">
+            <p class="eyebrow">Sampling story</p>
+            <h2>A single pixel asks for a UV, then the sampler decides which texels are allowed to answer</h2>
+            <p>
+              Texture sampling becomes easier to reason about when you stop imagining the whole image at once. One fragment
+              gets one interpolated UV, and the GPU has to turn that continuous coordinate into a discrete texel result.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="sampling-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="sampling-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="UV interpolation and texture filtering explainer"></canvas>
+                <p class="canvas-caption">The moving fragment inherits a UV inside the triangle, then nearest and linear filtering turn that same lookup into different output colors.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>The triangle corners start with known UV coordinates</h3>
+                    <p>Each vertex anchors a place in texture space, just like it anchors a position in model space.</p>
+                  </li>
+                  <li>
+                    <h3>Rasterization interpolates a UV for the fragment you are shading</h3>
+                    <p>The fragment does not inherit a texel directly. It inherits a blended UV location somewhere inside the texture.</p>
+                  </li>
+                  <li>
+                    <h3>The sampler lands between texels on a discrete grid</h3>
+                    <p>That is why textures are not continuous functions. The GPU has to interpret a fractional coordinate against stored samples.</p>
+                  </li>
+                  <li>
+                    <h3>Filtering decides whether one texel wins or nearby texels blend</h3>
+                    <p>Nearest chooses the closest texel. Linear blends the surrounding texels. Mipmaps help when one screen pixel covers a much larger footprint.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Texel versus pixel</h2>
+                    <p>A texel lives in the texture image. A pixel lives on the display. Sampling is the bridge between those two grids.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Why shimmer happens</h2>
+                    <p>If one screen pixel covers many texels, the sampler is being asked to summarize too much detail without enough prefiltering support.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="uv-walkthrough">
           <div class="section-header">
             <p class="eyebrow">Step by step</p>
@@ -161,9 +226,72 @@
                 <p>A 3D surface often has to be cut apart when flattened into 2D texture space, just like an orange peel.</p>
               </article>
               <article class="mini-card">
+                <h3>Color textures versus data textures</h3>
+                <p>Base-color images are usually authored for display and often need sRGB decoding before lighting. Normal, roughness, and mask textures are data and should stay linear.</p>
+              </article>
+              <article class="mini-card">
                 <h3>What comes next</h3>
                 <p>Materials decide how sampled textures, normals, and light directions combine into a final shaded surface.</p>
               </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mipmap-story">
+          <div class="section-header">
+            <p class="eyebrow">Mipmap story</p>
+            <h2>When one screen pixel covers many texels, the sampler should switch to a smaller prefiltered image</h2>
+            <p>
+              Filtering between nearby texels is not enough once the surface gets far away or highly tilted. At that point
+              a single screen sample is standing in for a whole patch of the texture, and the stable answer is usually to
+              read from a smaller mip level that was prefiltered ahead of time.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="mipmap-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="mipmap-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Mipmap selection explainer"></canvas>
+                <p class="canvas-caption">As the texture footprint grows, the chosen mip level gets smaller and more prefiltered so the sampled answer stays stable.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>The base texture can contain more detail than the screen can show</h3>
+                    <p>Once the projected footprint grows, one pixel is no longer asking about one texel-sized neighborhood.</p>
+                  </li>
+                  <li>
+                    <h3>Mipmaps store prefiltered copies at lower resolutions</h3>
+                    <p>Each smaller level summarizes a wider area, which gives the sampler a better starting point for minification.</p>
+                  </li>
+                  <li>
+                    <h3>The sampler chooses a level based on footprint size</h3>
+                    <p>A larger footprint means the stable answer usually comes from a lower-resolution mip level.</p>
+                  </li>
+                  <li>
+                    <h3>That is why mipmaps reduce shimmer</h3>
+                    <p>They replace unstable high-frequency guessing with a controlled prefiltered summary of the same texture.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Magnification versus minification</h2>
+                    <p>Nearest and linear mainly help when you are close enough to care about nearby texels. Mipmaps matter when you are far enough that many texels collapse into one pixel.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Seams still matter</h2>
+                    <p>Mipmaps solve prefiltering, not bad UV layout. A seam is still a discontinuity in how the surface was unwrapped.</p>
+                  </article>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -210,6 +338,120 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind a UV and a sampler mode, then inspect which texels are answering the lookup</h2>
+            <p>
+              This is the code-facing version of the sampling story. You are binding one UV location, a repeat factor,
+              and a filter choice, then watching the sampler resolve that request against a discrete texel grid.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="texture-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="texture-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="texture-code-highlight"></code></pre>
+                  <textarea
+                    id="texture-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+uv = vec2(0.62, 0.34)
+uv_scale = 6
+linear_filter = true</textarea>
+                </div>
+                <p id="texture-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The same lookup can pick one texel or blend several</h3>
+                <p>The sampled point, highlighted texels, and output swatch stay linked so filtering reads like a concrete rule instead of an abstract setting.</p>
+              </div>
+              <canvas id="texture-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Texture sampling code lab output"></canvas>
+              <p class="code-lab-caption">Nearest chooses one texel. Linear filtering blends the neighborhood around the same wrapped UV.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One UV request and one sampling policy</h3>
+              <p>The bindings define where the fragment lands in texture space, how often the pattern repeats, and whether the sampler should pick or blend texels.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Keep the UV fixed and flip only the filter</h3>
+              <p>Set <code>linear_filter = false</code>. The lookup location stays put, but the sample should collapse to a single nearest texel instead of a blended answer.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>Sampling becomes a measured lookup, not texture magic</h3>
+              <p>You can see that the image does not paint itself onto the mesh. The fragment asks for a coordinate, then the sampler resolves that coordinate against stored texels.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Watch how the same UV can still produce different colors under different filtering rules.</p>
+              </div>
+              <ol id="texture-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the sampler-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want to map the lesson bindings to shader-like texture calls.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="texture-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Wrapped UV</h3>
+              <code id="texture-code-readout-uv">(0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Nearest texel</h3>
+              <code id="texture-code-readout-texel">(0, 0)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Filter mode</h3>
+              <code id="texture-code-readout-mode">linear filter</code>
+            </article>
+            <article class="readout-card">
+              <h3>Sampled color</h3>
+              <code id="texture-code-readout-color">rgb (0.00, 0.00, 0.00)</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -227,7 +469,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>UV, texel, interpolation, nearest filter, linear filter, minification, mipmaps.</p>
+              <p>UV, texel, interpolation, nearest filter, linear filter, minification, mipmaps, sRGB.</p>
             </article>
           </div>
         </section>
@@ -248,7 +490,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 7 of 11.</p>
+      <p>Chapter 7 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

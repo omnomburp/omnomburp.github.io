@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 13: Physically Based Rendering and Image-Based Lighting</title>
+    <meta
+      name="description"
+      content="Advanced graphics lesson on metalness, roughness, Fresnel response, and image-based lighting with an interactive material demo."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-pbr">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a class="is-current" href="chapter-13-physically-based-rendering-and-image-based-lighting.html" aria-current="page">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 13</p>
+          <p class="sidebar-title">Physically based rendering and image-based lighting</p>
+          <p>This chapter upgrades classic material knobs into a more consistent story about energy, reflections, surface roughness, and environment light.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#material-story">Material story</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask which part of the image is coming from direct light, which part is coming from the environment, and how roughness is reshaping both.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 13</p>
+          <h1 class="page-title">A material looks believable when light, view, and environment agree on the same story</h1>
+          <p class="lede">
+            Physically based rendering is not magic realism. It is mostly discipline. Metals should reflect and tint differently from dielectrics.
+            Rough surfaces should spread highlights instead of keeping them razor sharp. The surrounding world should matter because real objects
+            do not only respond to one hand-placed light. Image-based lighting is one way to give that surrounding world a concrete role.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Metalness</h2>
+              <p>Controls whether the surface behaves more like a colored conductor or a dielectric with a small neutral F0.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Roughness</h2>
+              <p>Widens and softens the specular response instead of acting like a vague “shininess” number.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Environment light</h2>
+              <p>Lets reflections and ambient response depend on the world around the object instead of only on one direct light.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Metallic-roughness shortcut</span>
+              <code>F0 = mix(vec3(0.04), baseColor, metalness)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Roughness idea</span>
+              <code>higher roughness = wider lobe</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Environment idea</span>
+              <code>reflection samples the world, not empty space</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Modern material response is structured, not arbitrary</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Diffuse and specular are not independent decorations</h3>
+              <p>They are two ways light leaves a surface, and good material models keep them in a more coherent relationship.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Metals tint reflections strongly</h3>
+              <p>Dielectrics keep a small neutral base reflectance. Metals push more of the base color into the reflective response.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Roughness changes shape, not just brightness</h3>
+              <p>A rough highlight should broaden and blur. It is not enough to merely turn the highlight down.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Environment lighting stabilizes the look</h3>
+              <p>As the camera moves, the material still feels grounded because the surrounding world keeps contributing light and reflections.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="material-story">
+          <div class="section-header">
+            <p class="eyebrow">Material story</p>
+            <h2>PBR is mostly about using fewer arbitrary cheats</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Start with a base color that means something</h3>
+                <p>For dielectrics it mostly describes diffuse appearance. For metals it also drives the reflected tint more strongly.</p>
+              </li>
+              <li>
+                <h3>Let Fresnel increase reflection toward grazing angles</h3>
+                <p>Even simple models benefit when edges feel more reflective than head-on views.</p>
+              </li>
+              <li>
+                <h3>Use roughness to reshape the highlight and reflection</h3>
+                <p>Low roughness keeps a concentrated lobe. High roughness spreads that energy over a wider region.</p>
+              </li>
+              <li>
+                <h3>Light the object with a world, not just a lamp</h3>
+                <p>Image-based lighting gives the material something believable to reflect and picks up broad ambient cues from the scene.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Why this helps artists</h3>
+                <p>Material controls become more transferable across scenes because the knobs map to more stable physical ideas.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Common failure mode</h3>
+                <p>A surface has bright specular response and strong diffuse color at the same time in a way that feels energy-incoherent.</p>
+              </article>
+              <article class="mini-card">
+                <h3>IBL intuition</h3>
+                <p>The environment is just another light source, but one that comes from many directions and carries scene color with it.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Good debugging move</h3>
+                <p>Turn roughness to the extremes and rotate the environment. If nothing qualitative changes, the shader model is probably too weak.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Slide between dielectric and metal while reshaping the environment response</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                This demo shades a sphere with a simplified physically based response. The goal is not film accuracy. The goal is to feel how
+                roughness broadens the highlight, how metalness tints the reflection, and how the surrounding world changes the material even
+                when the direct light is kept simple.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Roughness</span>
+                  <input id="pbr-roughness" type="range" min="4" max="100" value="38" />
+                </label>
+                <label class="control">
+                  <span>Metalness</span>
+                  <input id="pbr-metalness" type="range" min="0" max="100" value="24" />
+                </label>
+                <label class="control">
+                  <span>Environment rotation</span>
+                  <input id="pbr-environment" type="range" min="0" max="100" value="18" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Set roughness low and metalness high. The bright band should tighten and the reflection tint should become stronger.</li>
+                <li>Raise roughness while keeping metalness high. The highlight should spread and the environment reflection should soften.</li>
+                <li>Rotate the environment and watch the same surface feel different because the incoming world light changed.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="pbr-canvas" class="canvas-stage" aria-label="Physically based material response demo"></canvas>
+              <p class="canvas-caption">The sphere is driven by roughness, metalness, Fresnel-like edge response, and a colored environment. The important idea is how those responsibilities stay distinct.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Base reflectance</h3>
+              <code id="pbr-f0-readout">vec3(0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Highlight lobe</h3>
+              <code id="pbr-lobe-readout">medium</code>
+            </article>
+            <article class="readout-card">
+              <h3>Material mode</h3>
+              <code id="pbr-response-readout">dielectric leaning</code>
+            </article>
+            <article class="readout-card">
+              <h3>Environment emphasis</h3>
+              <code id="pbr-environment-readout">warm horizon</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should stay with you after this chapter</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain how roughness changes a reflection differently from simply reducing its intensity?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating PBR as a preset look instead of a disciplined split between diffuse response, specular response, and environment contribution.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Carry forward</h3>
+              <p>A good material model makes the scene easier to light because the surfaces respond more predictably when the world changes.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-12-transparency-antialiasing-and-compositing.html">
+            <span class="page-direction">Back</span>
+            <strong>Transparency, antialiasing, and compositing</strong>
+            <p>Return to the chapter about layered pixels and why image quality is also a compositing problem.</p>
+          </a>
+          <a class="page-link-card" href="chapter-14-animation-hierarchies-and-skinning.html">
+            <span class="page-direction">Next</span>
+            <strong>Animation, hierarchies, and skinning</strong>
+            <p>Move from static surfaces into moving rigs, parent-child transforms, and deformation.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 13 of 15.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

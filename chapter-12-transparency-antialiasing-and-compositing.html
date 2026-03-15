@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 12: Transparency, Antialiasing, and Compositing</title>
+    <meta
+      name="description"
+      content="Advanced graphics lesson on transparency, edge coverage, compositing order, and antialiasing with an interactive canvas lab."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-transparency">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a class="is-current" href="chapter-12-transparency-antialiasing-and-compositing.html" aria-current="page">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 12</p>
+          <p class="sidebar-title">Transparency, antialiasing, and compositing</p>
+          <p>This chapter moves from “one winning fragment” toward the messier cases where several layers, partial coverage, and background color all matter.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#order-rules">Order rules</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask whether a pixel is partially covered, partially opaque, or both. Those are related ideas, but they are not the same thing.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 12</p>
+          <h1 class="page-title">Transparent images care about order, edges, and how layers mix</h1>
+          <p class="lede">
+            Opaque rendering is mostly a winner-takes-the-pixel story. Transparency breaks that simplicity. Now the renderer has to
+            care about draw order, partial edge coverage, how alpha is interpreted, and whether the colors being blended make sense
+            for the pipeline around them.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Transparency</h2>
+              <p>Alpha says how much a layer should contribute, but it does not remove the need to reason about order.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Antialiasing</h2>
+              <p>Coverage near an edge should change smoothly if you want silhouettes and overlaps to feel stable.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Compositing</h2>
+              <p>The final pixel is a layered result, not just a single surface color.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Straight alpha over opaque bg</span>
+              <code>out_rgb = src_rgb * a + dst_rgb * (1 - a)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Coverage question</span>
+              <code>edge != fully covered pixel</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Sorting rule</span>
+              <code>draw far layers before near layers</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>One pixel can be the result of several partial contributions</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Coverage is geometric</h3>
+              <p>A triangle edge may cover only part of a pixel. Antialiasing tries to preserve that partial coverage instead of snapping to all or nothing.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Opacity is material</h3>
+              <p>A tinted window can fully cover a pixel geometrically while still letting background light show through.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Order changes the answer</h3>
+              <p>Blend two translucent layers in the wrong order and the same scene data produces a different final color.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Correct compositing is part of image quality</h3>
+              <p>An otherwise sharp renderer can still look cheap if transparency halos, jagged silhouettes, or sorting errors remain unresolved.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="order-rules">
+          <div class="section-header">
+            <p class="eyebrow">Order rules</p>
+            <h2>Transparency stops being a pure depth-buffer problem</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Opaque geometry can usually trust the depth buffer</h3>
+                <p>The nearest fragment wins, and later fragments behind it can be rejected cheaply.</p>
+              </li>
+              <li>
+                <h3>Translucent geometry often needs back-to-front blending</h3>
+                <p>The background color must survive long enough for each layer in front of it to mix correctly.</p>
+              </li>
+              <li>
+                <h3>Aliasing is especially obvious on translucent edges</h3>
+                <p>Harsh binary edges create shimmering silhouettes and make overlapping layers look unstable.</p>
+              </li>
+              <li>
+                <h3>Premultiplication and color space still matter</h3>
+                <p>If alpha math is correct but the colors being mixed are wrong for the working space, the final image still looks off. The simple source-over formula above assumes straight alpha over an opaque background; premultiplied-alpha pipelines store alpha in the source color already.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Common failure mode</h3>
+                <p>A glass object is drawn before the wall behind it, so the wall never contributes correctly to the final pixel.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Edge reminder</h3>
+                <p>Coverage says how much of the pixel belongs to the primitive. Opacity says how much light that primitive should contribute.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Where MSAA helps</h3>
+                <p>It improves geometry edge coverage. It does not magically solve every transparency ordering problem by itself.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Good debugging move</h3>
+                <p>Freeze the camera, disable one translucent layer at a time, and inspect whether the blend order matches the scene depth you expect.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Compare a fragile transparent pass against a sorted, softer reference</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The left panel uses the controls you choose. The right panel stays as a reference with stable ordering and softer edge coverage.
+                Match them by fixing the draw order and increasing edge softness. This is a small scene, but the same failure modes appear in windows,
+                particles, foliage, UI layers, and hair rendering.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Layer opacity</span>
+                  <input id="transparency-alpha" type="range" min="20" max="85" value="58" />
+                </label>
+                <label class="control">
+                  <span>Edge softness</span>
+                  <input id="transparency-softness" type="range" min="0" max="100" value="32" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Use back-to-front sort</span>
+                  <input id="transparency-sort" type="checkbox" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Leave sorting off first. The two panels should disagree in the overlap region even though the circles have the same colors and alpha.</li>
+                <li>Turn sorting on. The overlap should stabilize because the back layers contribute before the front ones.</li>
+                <li>Raise edge softness and notice how the silhouettes feel less harsh against the checkerboard background.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="transparency-canvas" class="canvas-stage" aria-label="Transparency and compositing comparison"></canvas>
+              <p class="canvas-caption">Left: the current blend setup. Right: a sorted, antialiased reference. The goal is not a prettier picture by luck, but a pipeline that combines layers predictably.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Current order</h3>
+              <code id="transparency-order-readout">front to back</code>
+            </article>
+            <article class="readout-card">
+              <h3>Edge mode</h3>
+              <code id="transparency-edge-readout">hard coverage</code>
+            </article>
+            <article class="readout-card">
+              <h3>Opacity</h3>
+              <code id="transparency-alpha-readout">0.58</code>
+            </article>
+            <article class="readout-card">
+              <h3>Reference target</h3>
+              <code id="transparency-reference-readout">sorted + soft edges</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should stay with you after this chapter</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why two translucent surfaces can produce different colors when drawn in a different order?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Treating alpha as the same concept as pixel coverage and expecting one value to solve both problems.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Carry forward</h3>
+              <p>Image quality depends on how fragments combine, not just on how each fragment is shaded in isolation.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-11-color-tone-mapping-and-post-processing.html">
+            <span class="page-direction">Back</span>
+            <strong>Color and post-processing</strong>
+            <p>Return to the chapter that framed the final image as a pipeline instead of a single shader output.</p>
+          </a>
+          <a class="page-link-card" href="chapter-13-physically-based-rendering-and-image-based-lighting.html">
+            <span class="page-direction">Next</span>
+            <strong>Physically based rendering and image-based lighting</strong>
+            <p>Move from layer mixing into modern material response and environment lighting.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 12 of 15.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

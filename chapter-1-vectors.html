@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,12 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
-            <a href="#walkthrough">Step by step</a>
+            <a href="#rebuild">Rebuild a point</a>
+            <a href="#walkthrough">Translation and w</a>
+            <a href="#order-matters">Order matters</a>
             <a href="#lab">Live lab</a>
+            <a href="#playground">Point playground</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -61,8 +69,8 @@
           <h1 class="page-title">Vectors, bases, and matrix transforms</h1>
           <p class="lede">
             Computer graphics begins with a simple question: how do we describe points and directions in space?
-            Vectors answer that question. Bases tell us what the coordinate axes mean. Matrices tell us how to
-            rotate, scale, shear, or otherwise reinterpret those coordinates.
+            Vectors answer that question. Bases tell us what the coordinate axes mean. Matrices tell us how that
+            local frame can rotate, stretch, and, later, with one extra coordinate, translate.
           </p>
 
           <div class="goal-grid">
@@ -82,16 +90,19 @@
 
           <div class="formula-strip">
             <article class="formula-card">
-              <span class="formula-label">Coordinates as weights</span>
+              <span class="formula-label">Start here</span>
               <code>p = x i + y j</code>
+              <p class="card-note">Read coordinates as weights on basis directions, not as unexplained numbers.</p>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Transform a point</span>
+              <span class="formula-label">Then change the frame</span>
               <code>p' = M p</code>
+              <p class="card-note">A matrix changes how the same local point is rebuilt in space.</p>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Order matters</span>
-              <code>B(Ap) != A(Bp)</code>
+              <span class="formula-label">Next question</span>
+              <code>point or direction?</code>
+              <p class="card-note">We will learn translation after we separate those two cases clearly.</p>
             </article>
           </div>
         </section>
@@ -110,8 +121,8 @@
           <div class="step-grid">
             <article class="step-card">
               <span class="step-number">1</span>
-              <h3>A vector is direction plus magnitude</h3>
-              <p>Picture an arrow. Its orientation tells you where it points, and its length tells you how much movement it represents.</p>
+              <h3>The raw numbers are not the picture yet</h3>
+              <p>A coordinate like <code>(2, 1)</code> only becomes meaningful after you decide what the basis directions are.</p>
             </article>
             <article class="step-card">
               <span class="step-number">2</span>
@@ -125,51 +136,159 @@
             </article>
             <article class="step-card">
               <span class="step-number">4</span>
-              <h3>A matrix changes the frame</h3>
-              <p>Rotation, scaling, and shearing can all be seen as changing the basis vectors used to rebuild the point.</p>
+              <h3>A matrix changes that reconstruction rule</h3>
+              <p>Rotation and scale work by changing the basis itself. Translation is special enough that we will slow down and learn it next.</p>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="rebuild">
+          <div class="section-header">
+            <p class="eyebrow">Rebuild A Point</p>
+            <h2>Keep the weights fixed and let the basis move first</h2>
+            <p>
+              Before translation or long matrix chains, keep one sentence in your head: the point is rebuilt from basis
+              directions. The animation below keeps the weights fixed while the basis slowly rotates and stretches.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="basis-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="basis-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Animated basis reconstruction explainer"></canvas>
+                <p class="canvas-caption">Same weights every frame. Different basis every frame. The point is rebuilt from the moving basis.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Start with one local coordinate</h3>
+                    <p>Imagine the point <code>(1.2, 0.65)</code>. Read that as “take 1.2 copies of <code>i</code> and 0.65 copies of <code>j</code>.”</p>
+                  </li>
+                  <li>
+                    <h3>Build the point from those two contributions</h3>
+                    <p>The orange segment shows the contribution from <code>i</code>. The green segment adds the <code>j</code> contribution to reach the final point.</p>
+                  </li>
+                  <li>
+                    <h3>Move the basis, not the weights</h3>
+                    <p>As the basis rotates and stretches, the same weights rebuild a different final position. That is the core visual idea behind a matrix transform.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Plain-language sentence</h2>
+                    <p>“The point moved because the frame I used to rebuild it changed.”</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>What to notice</h2>
+                    <p>The weights stay constant throughout the animation. Only the basis directions and their lengths are changing.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
         <section class="panel reveal-block" id="walkthrough">
           <div class="section-header">
-            <p class="eyebrow">Step by step</p>
-            <h2>Walk one point through a transform chain</h2>
+            <p class="eyebrow">Translation And W</p>
+            <h2>Translation needs one extra coordinate because points and directions should not behave the same way</h2>
+            <p>
+              Rotation and scale can be understood as basis changes. Translation is different: it should move points,
+              but it should not move pure directions. Graphics handles that by adding one extra coordinate called
+              <code>w</code>.
+            </p>
           </div>
 
-          <div class="two-column">
-            <ol class="walkthrough-list">
-              <li>
-                <h3>Start with a local point</h3>
-                <p>Imagine the point <code>(1, 0.5)</code> inside a triangle. In its original basis, that means one unit along x and half a unit along y.</p>
-              </li>
-              <li>
-                <h3>Scale the basis</h3>
-                <p>If the x basis doubles in length, every x coordinate effectively covers more space. The shape widens without rewriting every vertex by hand.</p>
-              </li>
-              <li>
-                <h3>Rotate the basis</h3>
-                <p>Now turn those basis directions. The same coordinate weights now rebuild the point in a new orientation.</p>
-              </li>
-              <li>
-                <h3>Compose transforms carefully</h3>
-                <p>Scaling and then rotating is not the same as rotating and then scaling, because the second transform acts on the output of the first.</p>
-              </li>
-            </ol>
+          <div class="lesson-explainer" id="homogeneous-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
 
-            <div class="note-stack">
-              <article class="mini-card">
-                <h3>Say it in plain language</h3>
-                <p>“This matrix changes the axes, so the same shape coordinates now produce a different picture.”</p>
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="homogeneous-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Point versus direction translation explainer"></canvas>
+                <p class="canvas-caption">Same local value, same translation vector. The point moves because <code>w = 1</code>; the direction stays put because <code>w = 0</code>.</p>
               </article>
-              <article class="mini-card">
-                <h3>Beginner trap</h3>
-                <p>Do not think of matrices as arbitrary tables of numbers. Treat them as compact descriptions of geometric behavior.</p>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>A point should move with translation</h3>
+                    <p>If a point marks a location on an object, translating the object should move that location too.</p>
+                  </li>
+                  <li>
+                    <h3>A direction should keep its meaning</h3>
+                    <p>If a value means “this way,” shifting the whole object should not change that direction or its length.</p>
+                  </li>
+                  <li>
+                    <h3>Homogeneous coordinates add one more slot</h3>
+                    <p>Write points as <code>(x, y, z, 1)</code> and directions as <code>(x, y, z, 0)</code>. Now the matrix chain can tell those cases apart.</p>
+                  </li>
+                  <li>
+                    <h3>The translation offset is multiplied by <code>w</code></h3>
+                    <p>When <code>w = 1</code>, the offset is applied. When <code>w = 0</code>, the translation contribution disappears.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="formula-card">
+                    <span class="formula-label">Point</span>
+                    <code>p_h = (x, y, z, 1)</code>
+                  </article>
+                  <article class="formula-card">
+                    <span class="formula-label">Direction</span>
+                    <code>d_h = (x, y, z, 0)</code>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="order-matters">
+          <div class="section-header">
+            <p class="eyebrow">Order Matters</p>
+            <h2>Applying the same transforms in a different order produces a different motion</h2>
+            <p>
+              This idea is easier to trust once you see it. Both panels below use the same changing scale and rotation
+              values, but the highlighted corner traces a different path because the second transform always acts on the
+              result of the first.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="order-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="order-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Order of operations comparison animation"></canvas>
+                <p class="canvas-caption">Left: scale then rotate. Right: rotate then scale. The highlighted corner follows a different orbit in each case.</p>
               </article>
-              <article class="mini-card">
-                <h3>What this unlocks next</h3>
-                <p>Once transforms feel natural, moving from object space to world space becomes much less intimidating.</p>
-              </article>
+
+              <div class="step-grid">
+                <article class="mini-card">
+                  <h3>Scale then rotate</h3>
+                  <p>The shape stretches along its local axes first, then the already-stretched result is turned as a whole.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Rotate then scale</h3>
+                  <p>The shape turns first, so the later scale happens along axes that have already been rotated.</p>
+                </article>
+              </div>
             </div>
           </div>
         </section>
@@ -177,7 +296,7 @@
         <section class="panel reveal-block" id="lab">
           <div class="section-header">
             <p class="eyebrow">Live lab</p>
-            <h2>Use the controls to see the basis change in real time</h2>
+            <h2>Now grab the controls after the visual story is already in your head</h2>
           </div>
 
           <div class="lab-layout">
@@ -216,6 +335,202 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="playground">
+          <div class="section-header">
+            <p class="eyebrow">Point playground</p>
+            <h2>Drag one point and decide whether translation should affect it</h2>
+            <p>
+              This is the missing bridge between “coordinates are basis weights” and “matrices can translate points.”
+              Drag the point, watch its weights update, then toggle whether the same value should behave like a point
+              with <code>w = 1</code> or like a direction with <code>w = 0</code>.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Basis angle</span>
+                  <input id="basis-angle" type="range" min="-135" max="135" value="28" />
+                </label>
+                <label class="control">
+                  <span>Translate X</span>
+                  <input id="basis-translate-x" type="range" min="-120" max="120" value="36" />
+                </label>
+                <label class="control">
+                  <span>Translate Y</span>
+                  <input id="basis-translate-y" type="range" min="-120" max="120" value="-18" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Use <code>w = 1</code> translation</span>
+                  <input id="basis-translate-toggle" type="checkbox" checked />
+                </label>
+              </div>
+
+              <div class="readout-grid">
+                <article class="readout-card">
+                  <h3>Local weights</h3>
+                  <code id="basis-local-readout">(0.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Basis vectors</h3>
+                  <code id="basis-basis-readout">i = (0.00, 0.00), j = (0.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Homogeneous input</h3>
+                  <code id="basis-homogeneous-readout">(0.00, 0.00, 0, 1)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>World result</h3>
+                  <code id="basis-world-readout">(0.00, 0.00)</code>
+                </article>
+              </div>
+
+              <div class="study-grid">
+                <article class="mini-card">
+                  <h3>Point</h3>
+                  <p>A point uses <code>w = 1</code>, so translation offsets are allowed to move it.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Direction</h3>
+                  <p>A direction uses <code>w = 0</code>, so the same translation should leave it unchanged.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Why this matters</h3>
+                  <p>Graphics pipelines constantly mix points, directions, normals, and offsets. This is one of the first places where confusing those meanings causes bugs.</p>
+                </article>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Drag the orange point first. The readout is solving for basis weights, not screen coordinates.</li>
+                <li>Turn translation off and notice that the local reconstruction stays, but the offset no longer applies.</li>
+                <li>Turn translation back on and read the result as “basis reconstruction first, affine offset second.”</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="basis-probe-canvas" class="canvas-stage canvas-stage-compact" aria-label="Basis weight playground"></canvas>
+              <p class="canvas-caption">Drag the orange local point. The cyan copy only moves when the value is treated like a point with <code>w = 1</code>.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Write a few Python-like bindings, then watch them lower into matrix work</h2>
+            <p>
+              This editor is intentionally small. You are not writing a full program yet. You are declaring the values that
+              a WebGL draw would bind as uniforms or attributes, then inspecting the exact geometric steps that happen next.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="vectors-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="vectors-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="vectors-code-highlight"></code></pre>
+                  <textarea
+                    id="vectors-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+basis_angle = 28
+basis_scale = vec2(1.20, 0.92)
+point = vec2(1.10, 0.55)
+translate = vec2(0.80, -0.40)
+point_w = 1</textarea>
+                </div>
+                <p id="vectors-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>Bound values drive the geometry directly</h3>
+                <p>The stage updates from the lesson bindings instead of sliders, so each edit feels closer to a real draw setup.</p>
+              </div>
+              <canvas id="vectors-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Vectors code lab output"></canvas>
+              <p class="code-lab-caption">The editor changes the same idea you saw earlier, but now the geometry is being driven by explicit bound values instead of sliders.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>Bound values, not a full program</h3>
+              <p>These lines behave like values you would bind before a draw call: basis settings, point weights, translation, and the homogeneous <code>w</code>.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Flip the same value from point to direction</h3>
+              <p>Change <code>point_w = 1</code> to <code>point_w = 0</code>. The translation should stop affecting the value even though the same offset is still present.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>The implementation finally matches the picture</h3>
+              <p>It turns “matrices move points” into a step-by-step story: reconstruct from basis weights, pack a homogeneous vector, then apply the affine offset.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Read this first. It is the main implementation story behind the lab.</p>
+              </div>
+              <ol id="vectors-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the shader-shaped output</span>
+                <span class="code-lab-optional-hint">Keep this collapsed unless you want the WebGL-flavored version of the same flow.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="vectors-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Basis matrix</h3>
+              <code id="vectors-code-readout-basis">mat2(...)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Local XY</h3>
+              <code id="vectors-code-readout-local">(0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Homogeneous vector</h3>
+              <code id="vectors-code-readout-h">(0.00, 0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>World XY</h3>
+              <code id="vectors-code-readout-world">(0.00, 0.00)</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -233,7 +548,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Vector, basis, coordinate frame, transform, scale, rotation, shear, composition.</p>
+              <p>Vector, basis, coordinate frame, homogeneous coordinate, transform, scale, rotation, shear, composition.</p>
             </article>
           </div>
         </section>
@@ -254,7 +569,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 1 of 11.</p>
+      <p>Chapter 1 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

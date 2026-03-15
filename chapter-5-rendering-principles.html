@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,11 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#pipeline">Mental model</a>
+            <a href="#triangle-story">Triangle story</a>
+            <a href="#visibility-story">Visibility story</a>
             <a href="#frame">Frame walkthrough</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -126,6 +133,123 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="triangle-story">
+          <div class="section-header">
+            <p class="eyebrow">Triangle story</p>
+            <h2>Before a fragment exists, the GPU still has to clip, cull, cover pixels, and interpolate data</h2>
+            <p>
+              The phrase “rasterize the triangle” hides several important steps. The GPU does not jump directly from three
+              transformed vertices to a final pixel color. It first has to decide which triangle survives, which part stays
+              inside the view, which pixel centers count as covered, and how attributes should blend inside that coverage.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="triangle-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="triangle-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Triangle clipping culling and coverage explainer"></canvas>
+                <p class="canvas-caption">The triangle is clipped to the view, back faces can disappear, pixel centers determine coverage, and barycentric weights blend the vertex data inside the surviving area.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Clip triangles against the view volume</h3>
+                    <p>If part of a triangle falls outside the clip region, the GPU trims it before coverage is evaluated.</p>
+                  </li>
+                  <li>
+                    <h3>Optionally cull back-facing triangles</h3>
+                    <p>Faces pointing away from the camera are often thrown out early so they never become fragment candidates.</p>
+                  </li>
+                  <li>
+                    <h3>Test pixel centers for coverage</h3>
+                    <p>A triangle does not own every pixel it touches vaguely. The rasterizer uses exact sample positions to decide coverage.</p>
+                  </li>
+                  <li>
+                    <h3>Interpolate attributes with barycentric weights</h3>
+                    <p>The covered sample inherits a blend of the triangle’s vertex data, which is why one varying can change smoothly across the surface.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Why clipping exists</h2>
+                    <p>It keeps the pipeline from trying to rasterize geometry that should never appear inside the current view.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Why barycentric weights matter</h2>
+                    <p>They are the hidden math behind smooth color, UV, and normal interpolation across one triangle.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="visibility-story">
+          <div class="section-header">
+            <p class="eyebrow">Visibility story</p>
+            <h2>One pixel can receive multiple fragments, so the depth buffer keeps score</h2>
+            <p>
+              Rendering errors often feel mysterious because the final image hides the competition that happened per pixel.
+              This view slows that down and shows why depth testing decides which surface gets to speak for a screen sample.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="visibility-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="visibility-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Per-pixel depth test explainer"></canvas>
+                <p class="canvas-caption">Left: overlapping screen coverage. Middle: fragment candidates for one pixel. Right: the depth and color buffers keep the nearest winner.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Rasterization can produce several fragment candidates for one pixel</h3>
+                    <p>If two triangles overlap on screen, both can generate a fragment for the same pixel center.</p>
+                  </li>
+                  <li>
+                    <h3>Each candidate carries both color and depth</h3>
+                    <p>The color says what the surface would contribute. The depth says how far that surface is from the camera.</p>
+                  </li>
+                  <li>
+                    <h3>The depth test compares the incoming fragment to the stored winner</h3>
+                    <p>In the common case, the fragment with the smaller depth wins and replaces the older value in both buffers.</p>
+                  </li>
+                  <li>
+                    <h3>The color buffer shows only the winner unless blending changes the rule</h3>
+                    <p>Opaque rendering is mostly a one-winner story. Transparency and blending need extra rules because more than one layer can matter.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Depth buffer memory</h2>
+                    <p>Think of it as one stored depth number per pixel. Every new fragment has to beat that number before it can update the image.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Useful debugging question</h2>
+                    <p>If the wrong surface appears, ask whether the bug is in fragment generation, depth values, or the test itself before blaming the shader.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="frame">
           <div class="section-header">
             <p class="eyebrow">Step by step</p>
@@ -164,6 +288,10 @@
               <article class="mini-card">
                 <h3>Why color management matters</h3>
                 <p>If your math happens in the wrong color space, the image can look muddy or too dark even when the geometry is correct.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Transparency is a separate visibility problem</h3>
+                <p>Alpha-blended surfaces often need sorted draw order because the depth buffer alone cannot combine partially transparent layers correctly.</p>
               </article>
             </div>
           </div>
@@ -212,6 +340,122 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind two fragment candidates and make the depth test choose the final pixel</h2>
+            <p>
+              Rendering bugs often feel vague because the final image hides the competition that happened per pixel. This lab
+              strips the problem down to one pixel, two incoming fragments, and the exact rule that decides which one survives.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="rendering-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="rendering-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="rendering-code-highlight"></code></pre>
+                  <textarea
+                    id="rendering-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+front_depth = 0.34
+back_depth = 0.62
+front_color = vec3(0.22, 0.74, 0.94)
+back_color = vec3(0.96, 0.62, 0.34)
+depth_test = true</textarea>
+                </div>
+                <p id="rendering-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>One pixel, two fragments, one surviving buffer value</h3>
+                <p>The canvas slows the render down to the exact compare that the depth buffer performs for opaque visibility.</p>
+              </div>
+              <canvas id="rendering-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Rendering depth compare code lab output"></canvas>
+              <p class="code-lab-caption">With depth testing on, the smaller depth wins. With it off, the later draw call overwrites the earlier one.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>Two fragment candidates and one render-state toggle</h3>
+              <p>The bindings describe the incoming depth and color for two opaque fragments, plus whether the GPU should actually compare those depths.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Disable the compare without changing the scene</h3>
+              <p>Set <code>depth_test = false</code>. The farther fragment can now overwrite the nearer one simply because it is drawn later.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>The frame buffer stops feeling magical</h3>
+              <p>You can read the final image as explicit state updates: clear the depth buffer, draw one fragment, compare the next fragment, then store the winning color and depth.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Keep the order of operations in your head: clear, draw, compare, store.</p>
+              </div>
+              <ol id="rendering-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the render-state flavored output</span>
+                <span class="code-lab-optional-hint">Open this if you want the same story expressed like draw calls and buffer writes.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="rendering-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Front depth</h3>
+              <code id="rendering-code-readout-front">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Back depth</h3>
+              <code id="rendering-code-readout-back">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Rule</h3>
+              <code id="rendering-code-readout-rule">depth test on</code>
+            </article>
+            <article class="readout-card">
+              <h3>Winner</h3>
+              <code id="rendering-code-readout-winner">Front fragment</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -229,7 +473,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>What to study next</h3>
-              <p>Textures, antialiasing, shadow maps, physically based materials, post-processing, and tone mapping.</p>
+              <p>Textures, antialiasing, transparency sorting, shadow maps, physically based materials, post-processing, and tone mapping.</p>
             </article>
           </div>
         </section>
@@ -250,7 +494,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 5 of 11.</p>
+      <p>Chapter 5 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -44,7 +48,11 @@
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
             <a href="#stage-split">Stage split</a>
+            <a href="#data-path">Data path</a>
             <a href="#lab">Live lab</a>
+            <a href="#gpu-simulation">GPU simulation</a>
+            <a href="#varyings">Interpolation probe</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -98,7 +106,7 @@
         <section class="panel reveal-block" id="mental-model">
           <div class="section-header">
             <p class="eyebrow">Mental model</p>
-            <h2>Think in jobs: move geometry first, shade visible fragments later</h2>
+            <h2>Think in jobs: move geometry first, shade fragment candidates later</h2>
           </div>
 
           <div class="step-grid">
@@ -120,7 +128,7 @@
             <article class="step-card">
               <span class="step-number">4</span>
               <h3>The fragment shader finishes the look</h3>
-              <p>It receives interpolated values and computes the final color for each visible fragment.</p>
+              <p>It receives interpolated values and computes a color for each fragment candidate before the remaining per-sample tests and blending finish the job.</p>
             </article>
           </div>
         </section>
@@ -171,6 +179,83 @@ fragment shader
           </div>
         </section>
 
+        <section class="panel reveal-block" id="data-path">
+          <div class="section-header">
+            <p class="eyebrow">Data path</p>
+            <h2>A draw call turns raw arrays into shader inputs before the GPU can do any shading at all</h2>
+            <p>
+              Shader stages are only half the story. Before the vertex shader can run, the CPU has to upload vertex data,
+              describe how to read it, and issue a draw call. This is the missing bridge between “shader code exists” and
+              “the GPU can actually start rendering.”
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="shader-dataflow-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Step through the draw call</p>
+                  <div class="explainer-step-row" aria-label="Shader data path steps">
+                    <button type="button" class="explainer-step is-active" data-shader-dataflow-step="0" aria-pressed="true">1 CPU arrays</button>
+                    <button type="button" class="explainer-step" data-shader-dataflow-step="1" aria-pressed="false">2 GPU buffers</button>
+                    <button type="button" class="explainer-step" data-shader-dataflow-step="2" aria-pressed="false">3 Attribute layout</button>
+                    <button type="button" class="explainer-step" data-shader-dataflow-step="3" aria-pressed="false">4 Draw + shaders</button>
+                  </div>
+                </div>
+
+                <div class="explainer-actions">
+                  <button type="button" class="explainer-toolbar-button" id="shader-dataflow-prev">Previous</button>
+                  <button type="button" class="explainer-toolbar-button" id="shader-dataflow-next">Next</button>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="shader-dataflow-canvas" class="canvas-stage canvas-stage-wide" aria-label="CPU to GPU shader data flow explainer"></canvas>
+                <p class="canvas-caption" id="shader-dataflow-caption">
+                  CPU arrays begin on the CPU. They only become shader inputs after upload, attribute wiring, and a draw call.
+                </p>
+              </article>
+
+              <div class="explainer-detail-grid">
+                <article class="mini-card explainer-detail-card">
+                  <p class="eyebrow">Current step</p>
+                  <h3 id="shader-dataflow-step-title">Start with raw vertex data on the CPU</h3>
+                  <p id="shader-dataflow-step-body">
+                    Positions, UVs, normals, and indices usually begin as plain arrays of numbers in application memory.
+                  </p>
+                </article>
+                <article class="mini-card explainer-detail-card">
+                  <p class="eyebrow">What changes next</p>
+                  <p id="shader-dataflow-step-transition">
+                    Those numbers have to be uploaded into GPU buffers before the draw call can reference them.
+                  </p>
+                </article>
+                <article class="mini-card explainer-detail-card">
+                  <p class="eyebrow">Key term</p>
+                  <p id="shader-dataflow-step-vocab">
+                    CPU memory is the host-side copy. The GPU still knows nothing about these arrays until you upload them.
+                  </p>
+                </article>
+              </div>
+
+              <div class="goal-grid explainer-note-grid">
+                <article class="mini-card">
+                  <h2>VBO intuition</h2>
+                  <p>Think of a vertex buffer as raw GPU-side storage for per-vertex data, not as a shader by itself.</p>
+                </article>
+                <article class="mini-card">
+                  <h2>Index buffer intuition</h2>
+                  <p>An index buffer is the reuse plan. It tells the draw call which existing vertices should be assembled into triangles.</p>
+                </article>
+                <article class="mini-card">
+                  <h2>VAO intuition</h2>
+                  <p>In modern GL-style APIs, a vertex array object is the saved recipe for how those buffers map into attributes.</p>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="lab">
           <div class="section-header">
             <p class="eyebrow">Live lab</p>
@@ -202,14 +287,451 @@ fragment shader
               <ul class="bullet-list">
                 <li>Turn wave height down to almost zero. The color pattern stays, but the mesh shape becomes flat.</li>
                 <li>Raise stripe density. The geometry stays the same while the fragment-level detail increases.</li>
-                <li>Keep asking which stage created the change you just saw.</li>
+                <li>Open the sample code tab and match each slider to the stage it actually changes.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card shader-live-panel">
+              <div class="shader-live-tabs" role="tablist" aria-label="Shader live lab views">
+                <button
+                  class="shader-live-tab is-active"
+                  id="shader-live-tab-scene"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="shader-live-panel-scene"
+                >
+                  Live scene
+                </button>
+                <button
+                  class="shader-live-tab"
+                  id="shader-live-tab-code"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="shader-live-panel-code"
+                >
+                  Sample code
+                </button>
+              </div>
+
+              <div
+                id="shader-live-panel-scene"
+                class="shader-live-tab-panel"
+                role="tabpanel"
+                aria-labelledby="shader-live-tab-scene"
+              >
+                <canvas id="shader-canvas" class="canvas-stage" aria-label="Shader stage demo"></canvas>
+                <p class="canvas-caption">Vertex stage: reshape the surface. Fragment stage: paint the visible result.</p>
+              </div>
+
+              <div
+                id="shader-live-panel-code"
+                class="shader-live-tab-panel shader-live-code-panel"
+                role="tabpanel"
+                aria-labelledby="shader-live-tab-code"
+                hidden
+              >
+                <div class="shader-live-copy">
+                  <p class="sidebar-label">Sample code</p>
+                  <h3>The same demo split into the two shader jobs</h3>
+                  <p>The snippets below are simplified but aligned to the live scene: the vertex shader bends positions, and the fragment shader turns varyings into color.</p>
+                </div>
+
+                <div class="shader-binding-strip" aria-label="Current shader bindings">
+                  <span id="shader-live-binding-wave" class="shader-binding-pill">Wave height 0.32 -> vertex stage</span>
+                  <span id="shader-live-binding-stripe" class="shader-binding-pill">Stripe density 12.00 -> fragment stage</span>
+                  <span id="shader-live-binding-shift" class="shader-binding-pill">Color drift 0.44 -> fragment stage</span>
+                </div>
+
+                <article class="shader-stage-card">
+                  <div class="shader-stage-head">
+                    <span class="shader-stage-chip">Draw-call bindings</span>
+                    <p>These are the uniform values the CPU side is sending into the pass right now.</p>
+                  </div>
+                  <pre class="code-block code-block-compact"><code id="shader-live-bindings-code"></code></pre>
+                </article>
+
+                <div class="shader-stage-grid">
+                  <article class="shader-stage-card">
+                    <div class="shader-stage-head">
+                      <span class="shader-stage-chip">Vertex shader</span>
+                      <p>This stage moves the mesh before rasterization.</p>
+                    </div>
+                    <pre class="code-block code-block-compact"><code id="shader-live-vertex-code"></code></pre>
+                  </article>
+
+                  <article class="shader-stage-card">
+                    <div class="shader-stage-head">
+                      <span class="shader-stage-chip">Fragment shader</span>
+                      <p>This stage turns interpolated varyings into the visible surface pattern.</p>
+                    </div>
+                    <pre class="code-block code-block-compact"><code id="shader-live-fragment-code"></code></pre>
+                  </article>
+                </div>
+
+                <p class="canvas-caption">Read the tabs together: the live scene shows the result, and the sample code shows which stage is responsible for it.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="gpu-simulation">
+          <div class="section-header">
+            <p class="eyebrow">GPU simulation</p>
+            <h2>Fluid-like particles show the kind of job compute shaders are built for</h2>
+            <p>
+              Vertex and fragment shaders are tied to drawing geometry. Compute shaders are different: they update
+              arbitrary state first, then a later render pass visualizes that state. This chapter still runs on a WebGL
+              baseline, so the live scene below teaches the same parallel idea with a lightweight particle fluid and
+              compute-style pseudocode rather than a true compute dispatch.
+            </p>
+          </div>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>One invocation per particle</h2>
+              <p>Particle motion is repetitive work. Every element follows the same update rule, which is exactly what makes it parallel-friendly.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Update pass before draw pass</h2>
+              <p>Compute-style work updates positions and velocities first. A later render pass reads that state and draws the visible spheres.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Why it often beats the CPU</h2>
+              <p>The GPU can update many particles at once and keep the state on the device instead of bouncing it back through CPU-side loops every frame.</p>
+            </article>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                Click or drag inside the tank to inject motion. Then raise the particle count and keep an eye on the
+                serial CPU work versus the compute-style dispatch summary. The visual stays simple on purpose so the
+                lesson is about the job split: update state first, render it second.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Particle count</span>
+                  <input id="shader-compute-count" type="range" min="72" max="240" step="12" value="156" />
+                </label>
+                <label class="control">
+                  <span>Push strength</span>
+                  <input id="shader-compute-push" type="range" min="10" max="100" value="58" />
+                </label>
+                <label class="control">
+                  <span>Viscosity</span>
+                  <input id="shader-compute-viscosity" type="range" min="0" max="100" value="46" />
+                </label>
+              </div>
+
+              <div class="readout-grid">
+                <article class="readout-card">
+                  <h3>Particles</h3>
+                  <code id="shader-fluid-readout-particles">156</code>
+                </article>
+                <article class="readout-card">
+                  <h3>CPU serial checks</h3>
+                  <code id="shader-fluid-readout-cpu">12,090 / step</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Compute dispatch</h3>
+                  <code id="shader-fluid-readout-groups">3 groups x 64 lanes</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Frame split</h3>
+                  <code id="shader-fluid-readout-pass">update pass -> render pass</code>
+                </article>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Drag through the particles to stir the fluid. That input acts like a force field, not like direct vertex dragging.</li>
+                <li>Increase particle count and notice how fast the CPU-style pair checks grow compared with the dispatch description.</li>
+                <li>Open the sample code tab and read it as a two-pass story: first update arbitrary state, then draw spheres from the updated buffer.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card shader-live-panel">
+              <div class="shader-live-tabs" role="tablist" aria-label="GPU simulation views">
+                <button
+                  class="shader-live-tab is-active"
+                  id="shader-fluid-tab-scene"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="shader-fluid-panel-scene"
+                >
+                  Live sim
+                </button>
+                <button
+                  class="shader-live-tab"
+                  id="shader-fluid-tab-code"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="shader-fluid-panel-code"
+                >
+                  Sample code
+                </button>
+              </div>
+
+              <div
+                id="shader-fluid-panel-scene"
+                class="shader-live-tab-panel"
+                role="tabpanel"
+                aria-labelledby="shader-fluid-tab-scene"
+              >
+                <canvas id="shader-fluid-canvas" class="canvas-stage" aria-label="Compute-style particle fluid simulation"></canvas>
+                <p class="canvas-caption">Compute-style mental model: update particle state first, then render the updated spheres in a separate pass.</p>
+              </div>
+
+              <div
+                id="shader-fluid-panel-code"
+                class="shader-live-tab-panel shader-live-code-panel"
+                role="tabpanel"
+                aria-labelledby="shader-fluid-tab-code"
+                hidden
+              >
+                <div class="shader-live-copy">
+                  <p class="sidebar-label">Sample code</p>
+                  <h3>The same particle lesson written as CPU work versus compute-style work</h3>
+                  <p>The point is not exact API syntax. The point is that compute shaders update arbitrary state buffers, then a later draw pass turns that state into visible spheres.</p>
+                </div>
+
+                <div class="shader-binding-strip" aria-label="Current compute-style bindings">
+                  <span id="shader-fluid-binding-count" class="shader-binding-pill">156 particles -> state buffer</span>
+                  <span id="shader-fluid-binding-groups" class="shader-binding-pill">3 groups x 64 lanes -> update pass</span>
+                  <span id="shader-fluid-binding-render" class="shader-binding-pill">draw pass reads updated positions</span>
+                </div>
+
+                <article class="shader-stage-card">
+                  <div class="shader-stage-head">
+                    <span class="shader-stage-chip">Frame orchestration</span>
+                    <p>This is the CPU-side story: dispatch the update pass first, then issue a render pass that consumes the updated particle state.</p>
+                  </div>
+                  <pre class="code-block code-block-compact"><code id="shader-fluid-bindings-code"></code></pre>
+                </article>
+
+                <div class="shader-stage-grid">
+                  <article class="shader-stage-card">
+                    <div class="shader-stage-head">
+                      <span class="shader-stage-chip">CPU reference</span>
+                      <p>A serial loop updates one particle after another and pays for every neighbor comparison on the host.</p>
+                    </div>
+                    <pre class="code-block code-block-compact"><code id="shader-fluid-cpu-code"></code></pre>
+                  </article>
+
+                  <article class="shader-stage-card">
+                    <div class="shader-stage-head">
+                      <span class="shader-stage-chip">Compute shader</span>
+                      <p>In a compute-capable API, one invocation can own one particle update while the state stays on the GPU.</p>
+                    </div>
+                    <pre class="code-block code-block-compact"><code id="shader-fluid-compute-code"></code></pre>
+                  </article>
+                </div>
+
+                <p class="canvas-caption">This chapter’s runtime is still WebGL-era, but the code tab shows the compute-shader shape the lesson is pointing toward.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="varyings">
+          <div class="section-header">
+            <p class="eyebrow">Interpolation probe</p>
+            <h2>Hover one fragment and trace the full path from vertex attribute to final fragment color</h2>
+            <p>
+              This is the second half of the shader story. Vertex attributes live only at the corners. The rasterizer blends
+              them into varyings across the triangle. The fragment shader then turns those varyings into a visible color for
+              the pixel-sized sample you are hovering.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Warp amount</span>
+                  <input id="shader-probe-warp" type="range" min="0" max="100" value="28" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show fragment bands</span>
+                  <input id="shader-probe-bands" type="checkbox" checked />
+                </label>
+              </div>
+
+              <div class="readout-grid">
+                <article class="readout-card">
+                  <h3>Vertex A attribute</h3>
+                  <code id="shader-probe-attr-a">uv = (0.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Vertex B attribute</h3>
+                  <code id="shader-probe-attr-b">uv = (1.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Vertex C attribute</h3>
+                  <code id="shader-probe-attr-c">uv = (0.15, 1.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Interpolated varying</h3>
+                  <code id="shader-probe-varying">Move inside the triangle</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Hovered fragment</h3>
+                  <code id="shader-probe-fragment">No covered fragment</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Fragment color</h3>
+                  <div class="color-readout">
+                    <span id="shader-probe-color-chip" class="color-swatch"></span>
+                    <code id="shader-probe-color">rgb = (0.00, 0.00, 0.00)</code>
+                  </div>
+                </article>
+              </div>
+
+              <div class="study-grid">
+                <article class="mini-card">
+                  <h3>Attribute</h3>
+                  <p>The value stored at each vertex before the triangle is assembled.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Varying</h3>
+                  <p>The interpolated value produced between vertices after rasterization covers the triangle.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Fragment output</h3>
+                  <p>The visible color after the fragment shader uses the varying to run one more piece of logic.</p>
+                </article>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Hover near each corner first. The varying should be close to that corner’s original attribute.</li>
+                <li>Increase warp amount and notice that the triangle shape changes, but the attributes stay attached to their vertices.</li>
+                <li>Turn fragment bands on and off to separate “interpolated varying” from “extra fragment math based on that varying.”</li>
               </ul>
             </div>
 
             <div class="canvas-card">
-              <canvas id="shader-canvas" class="canvas-stage" aria-label="Shader stage demo"></canvas>
-              <p class="canvas-caption">Vertex stage: reshape the surface. Fragment stage: paint the visible result.</p>
+              <canvas id="shader-probe-canvas" class="canvas-stage canvas-stage-compact" aria-label="Shader interpolation probe"></canvas>
+              <p class="canvas-caption">The hover readout is following one fragment through the last two steps: interpolation first, fragment logic second.</p>
             </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind one vertex-stage wave and one fragment-stage color rule, then watch them separate</h2>
+            <p>
+              This editor keeps the shader lesson deliberately small. You are not authoring GLSL from scratch. You are binding the
+              values that drive one vertex deformation and one fragment coloring pass, then inspecting where each effect actually comes from.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="shader-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="shader-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="shader-code-highlight"></code></pre>
+                  <textarea
+                    id="shader-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+wave_height = 0.32
+wave_density = 12
+color_shift = 0.44
+time = 0.60</textarea>
+                </div>
+                <p id="shader-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>Mesh motion and fragment color stay visibly separate</h3>
+                <p>The deformed grid is the vertex-stage story. The cell coloring is the fragment-stage story layered on top of it.</p>
+              </div>
+              <canvas id="shader-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Shader stage code lab output"></canvas>
+              <p class="code-lab-caption">One bound wave rule moves the mesh. A different bound color rule paints the final fragments.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>Uniform-like controls for two different stages</h3>
+              <p>These lines behave like the shared values you would bind for a shader pass: wave controls for vertex work and color-shift controls for fragment work.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Flatten the geometry without erasing the color logic</h3>
+              <p>Set <code>wave_height = 0.00</code>. The mesh should stop moving, but the fragment-side color pattern should still be visible.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>You can finally point at the stage that caused the change</h3>
+              <p>The same picture now doubles as a debugging story: vertex work changes positions, rasterization interpolates varyings, and fragment work computes the visible color.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Read this as a GPU job split, not as one monolithic program.</p>
+              </div>
+              <ol id="shader-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the shader-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want the binding story rewritten as a vertex-plus-fragment pair.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="shader-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Center vertex offset</h3>
+              <code id="shader-code-readout-vertex">0.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Center varying uv</h3>
+              <code id="shader-code-readout-varying">(0.50, 0.50)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Center fragment color</h3>
+              <code id="shader-code-readout-fragment">rgb (0.00, 0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Edge wave sample</h3>
+              <code id="shader-code-readout-edge">0.000</code>
+            </article>
           </div>
         </section>
 
@@ -251,7 +773,7 @@ fragment shader
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 4 of 11.</p>
+      <p>Chapter 4 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

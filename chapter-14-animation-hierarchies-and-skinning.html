@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chapter 14: Animation, Hierarchies, and Skinning</title>
+    <meta
+      name="description"
+      content="Advanced graphics lesson on keyframed motion, parent-child transforms, and linear blend skinning with an interactive rig demo."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="chapter-page chapter-animation">
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="index.html">Graphics Field Guide</a>
+        <div class="nav-links">
+          <a href="index.html">Overview</a>
+          <a href="chapter-1-vectors.html">1 Vectors</a>
+          <a href="chapter-2-coordinate-spaces.html">2 Spaces</a>
+          <a href="chapter-3-surface-normals.html">3 Normals</a>
+          <a href="chapter-4-shaders.html">4 Shaders</a>
+          <a href="chapter-5-rendering-principles.html">5 Rendering</a>
+          <a href="chapter-6-cameras-and-projection.html">6 Cameras</a>
+          <a href="chapter-7-textures-and-sampling.html">7 Textures</a>
+          <a href="chapter-8-materials-and-lighting-models.html">8 Materials</a>
+          <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
+          <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
+          <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a class="is-current" href="chapter-14-animation-hierarchies-and-skinning.html" aria-current="page">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="chapter-shell">
+      <aside class="chapter-sidebar">
+        <section class="aside-card">
+          <p class="eyebrow">Chapter 14</p>
+          <p class="sidebar-title">Animation, hierarchies, and skinning</p>
+          <p>This chapter turns transforms into motion: parents drive children, keyframes describe poses, and bone weights deform a mesh instead of just moving rigid pieces.</p>
+        </section>
+
+        <nav class="aside-card" aria-label="On this page">
+          <p class="sidebar-label">On this page</p>
+          <div class="outline-list">
+            <a href="#mental-model">Mental model</a>
+            <a href="#deformation-story">Deformation story</a>
+            <a href="#lab">Live lab</a>
+            <a href="#checkpoints">Checkpoints</a>
+          </div>
+        </nav>
+
+        <section class="aside-card">
+          <p class="sidebar-label">Study prompt</p>
+          <p>Ask whether a point is being moved by one transform directly, or by several bone transforms blended together through weights.</p>
+        </section>
+      </aside>
+
+      <article class="course-article">
+        <section class="panel chapter-hero reveal-block">
+          <p class="eyebrow">Chapter 14</p>
+          <h1 class="page-title">Animation works when motion flows down a hierarchy and deformation follows the rig</h1>
+          <p class="lede">
+            A model that looked fine as a static mesh becomes harder the moment it has to move. Now transforms are linked through parent-child chains,
+            poses have to interpolate over time, and the visible surface has to follow the skeleton smoothly enough that elbows and wrists do not tear
+            the character apart. This chapter introduces that bridge from transforms to moving characters.
+          </p>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h2>Hierarchies</h2>
+              <p>A child transform inherits the motion of its parent, which is why hands follow forearms and forearms follow shoulders.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Keyframes</h2>
+              <p>Animation stores important poses and fills the motion between them with interpolation rules. Positions often use <code>lerp</code>; rotations usually use quaternion interpolation.</p>
+            </article>
+            <article class="mini-card">
+              <h2>Skinning</h2>
+              <p>Vertices can blend several bone transforms so the surface bends instead of breaking at joints.</p>
+            </article>
+          </div>
+
+          <div class="formula-strip">
+            <article class="formula-card">
+              <span class="formula-label">Hierarchy</span>
+              <code>global = parent * local</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">One position blend</span>
+              <code>position = lerp(A, B, t)</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Skinning idea</span>
+              <code>vertex = sum(weight_i * bone_i(vertex))</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="mental-model">
+          <div class="section-header">
+            <p class="eyebrow">Mental model</p>
+            <h2>Motion is a transform problem first, then a deformation problem</h2>
+          </div>
+
+          <div class="step-grid">
+            <article class="step-card">
+              <span class="step-number">1</span>
+              <h3>Pose the skeleton</h3>
+              <p>Joint transforms establish where the major parts of the character should be right now.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <h3>Let children inherit parent motion</h3>
+              <p>A wrist does not move in isolation. Its global transform already includes the shoulder and elbow chain above it.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <h3>Bind the mesh to those bones</h3>
+              <p>Each vertex stores one or more bone influences so the visible surface has a rule for following the rig.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">4</span>
+              <h3>Blend carefully near joints</h3>
+              <p>Hard ownership can produce visible seams. Weighted blending helps the surface bend more naturally.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="deformation-story">
+          <div class="section-header">
+            <p class="eyebrow">Deformation story</p>
+            <h2>The rig and the surface do different jobs</h2>
+          </div>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>The hierarchy solves spatial relationships</h3>
+                <p>If the shoulder rotates, the elbow and hand should already move because their frames live under the shoulder in the chain.</p>
+              </li>
+              <li>
+                <h3>Keyframes solve timing</h3>
+                <p>The animator stores important poses, then the system interpolates in-between values so motion feels continuous. Translations and scales are often lerped; rotations are usually blended with quaternion interpolation.</p>
+              </li>
+              <li>
+                <h3>Skinning solves surface continuity</h3>
+                <p>The rig can move correctly while the mesh still looks bad. Skinning is the layer that turns rigid transforms into soft deformation.</p>
+              </li>
+              <li>
+                <h3>Secondary lag changes the feeling of weight</h3>
+                <p>Children do not always snap in perfect sync. A little delay in lower joints can make motion feel less robotic.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>Common failure mode</h3>
+                <p>The skeleton poses correctly, but the mesh is attached with hard ownership so the elbow collapses into obvious rigid chunks.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Where quaternions enter later</h3>
+                <p>This chapter stays conceptual. Production systems often interpolate rotations with quaternions to avoid the artifacts that simple component-wise Euler blending can cause in 3D joints.</p>
+              </article>
+              <article class="mini-card">
+                <h3>What “weights” mean</h3>
+                <p>They are just fractions that tell each vertex how much authority each nearby bone has over its final position.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Good debugging move</h3>
+                <p>Draw the bones over the mesh. If the rig motion looks right but the surface looks wrong, the bug is probably in the bind or weights.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Pose a simple arm rig and compare rigid attachment against smooth skinning</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The skeleton below drives a simple arm-like strip. Use the pose slider to bend the chain, add lag so child joints trail slightly,
+                then switch between rigid ownership and smooth skinning. The rig motion stays similar in both modes. What changes is how the surface
+                interprets it near the joints.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Pose progress</span>
+                  <input id="animation-pose" type="range" min="0" max="100" value="58" />
+                </label>
+                <label class="control">
+                  <span>Child lag</span>
+                  <input id="animation-lag" type="range" min="0" max="100" value="26" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Use smooth skinning</span>
+                  <input id="animation-skinning" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Turn smooth skinning off first. The arm should bend with sharper seams where ownership changes from one bone to the next.</li>
+                <li>Turn smooth skinning on. The same pose should deform more continuously around the elbow and wrist.</li>
+                <li>Increase child lag and notice how the hand trails the shoulder slightly, which changes the feeling of weight and timing.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="animation-canvas" class="canvas-stage" aria-label="Animation hierarchy and skinning demo"></canvas>
+              <p class="canvas-caption">The white line is the arm mesh. The joint chain underneath it is the rig. The lesson is that hierarchy and skinning solve different problems, even when they drive the same motion.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Pose progress</h3>
+              <code id="animation-pose-readout">0.58</code>
+            </article>
+            <article class="readout-card">
+              <h3>Deform mode</h3>
+              <code id="animation-mode-readout">linear blend skinning</code>
+            </article>
+            <article class="readout-card">
+              <h3>Hand position</h3>
+              <code id="animation-hand-readout">(0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Joint lag</h3>
+              <code id="animation-lag-readout">0.26</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="checkpoints">
+          <div class="section-header">
+            <p class="eyebrow">Checkpoints</p>
+            <h2>What should stay with you after this chapter</h2>
+          </div>
+
+          <div class="callout-grid">
+            <article class="checkpoint-card">
+              <h3>Self-test</h3>
+              <p>Can you explain why a hand transform already depends on every parent joint above it in the hierarchy?</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Common mistake</h3>
+              <p>Thinking the skeleton and the mesh are the same data. The rig drives motion; the mesh is the visible surface that interprets it.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Carry forward</h3>
+              <p>Animation is a natural continuation of the transform chapters: the math is familiar, but now it has to stay coherent over time.</p>
+            </article>
+          </div>
+        </section>
+
+        <nav class="chapter-pagination reveal-block" aria-label="Chapter pagination">
+          <a class="page-link-card" href="chapter-13-physically-based-rendering-and-image-based-lighting.html">
+            <span class="page-direction">Back</span>
+            <strong>Physically based rendering and image-based lighting</strong>
+            <p>Return to the material chapter if you want a static surface before continuing into moving rigs.</p>
+          </a>
+          <a class="page-link-card" href="chapter-15-acceleration-culling-and-level-of-detail.html">
+            <span class="page-direction">Next</span>
+            <strong>Acceleration, culling, and level of detail</strong>
+            <p>Finish the extension track with the real-time question of how to avoid spending work where it will not matter.</p>
+          </a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <p>Chapter 14 of 15.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

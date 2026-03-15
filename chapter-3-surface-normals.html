@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -45,6 +49,8 @@
             <a href="#mental-model">Mental model</a>
             <a href="#lighting-logic">Lighting logic</a>
             <a href="#lab">Live lab</a>
+            <a href="#meter">Alignment meter</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -210,6 +216,201 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="meter">
+          <div class="section-header">
+            <p class="eyebrow">Alignment meter</p>
+            <h2>Break the normal on purpose, then fix it and watch the dot product recover</h2>
+            <p>
+              The dot product can feel abstract until you watch its ingredients change independently. This patch shows the
+              geometric surface, the light direction, and the actual normal used for shading. Non-uniform scale is included
+              because it is one of the first real bugs that makes “normal as direction” stop being just theory.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Surface angle</span>
+                  <input id="normal-probe-surface" type="range" min="-75" max="75" value="18" />
+                </label>
+                <label class="control">
+                  <span>Light angle</span>
+                  <input id="normal-probe-light" type="range" min="-180" max="180" value="42" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Non-uniform scale</span>
+                  <input id="normal-probe-scale" type="checkbox" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Fix normal matrix</span>
+                  <input id="normal-probe-fix" type="checkbox" checked />
+                </label>
+              </div>
+
+              <div class="readout-grid">
+                <article class="readout-card">
+                  <h3>Geometric normal</h3>
+                  <code id="normal-probe-geometry">(0.00, 1.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Shader normal</h3>
+                  <code id="normal-probe-shader">(0.00, 1.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Light direction</h3>
+                  <code id="normal-probe-light-readout">(0.00, 1.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Diffuse term</h3>
+                  <code id="normal-probe-dot">0.00</code>
+                </article>
+              </div>
+
+              <div class="study-grid">
+                <article class="mini-card">
+                  <h3>When the bug appears</h3>
+                  <p>Pure rotation keeps the normal correct, so the fix looks unnecessary. The error shows up once the scale is uneven.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>What the fix means</h3>
+                  <p>The inverse transpose is not magic. It is the linear-algebra move that keeps a normal perpendicular to the transformed surface.</p>
+                </article>
+                <article class="mini-card">
+                  <h3>Why the meter helps</h3>
+                  <p>If the patch orientation looks right but the meter drops unexpectedly, the normal pipeline is the first place to inspect.</p>
+                </article>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Turn non-uniform scale on and fix off. The patch is the same surface, but the shader normal tilts incorrectly.</li>
+                <li>Turn the fix back on and compare the numeric dot product before and after. That is the bug becoming measurable.</li>
+                <li>Use this chapter whenever a lit object looks wrong even though the geometry appears to be in the right place.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="normal-probe-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normal alignment meter"></canvas>
+              <p class="canvas-caption">White shows the surface normal implied by geometry. Cyan shows the normal the shader is actually using for the diffuse dot product.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind one surface transform and inspect the exact normal the shader should use</h2>
+            <p>
+              This is the implementation-facing version of the alignment meter. The bindings below describe one surface patch,
+              one light direction, and whether the shader is using the corrected normal matrix. The output shows the bug and the fix directly.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="normal-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="normal-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="normal-code-highlight"></code></pre>
+                  <textarea
+                    id="normal-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+surface_angle = 18
+light_angle = 42
+scale = vec2(1.80, 0.52)
+fix_normal_matrix = true</textarea>
+                </div>
+                <p id="normal-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The shader normal becomes a visible implementation choice</h3>
+                <p>The patch, light vector, and diffuse meter now respond to explicit lesson bindings instead of only slider motion.</p>
+              </div>
+              <canvas id="normal-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normal matrix code lab output"></canvas>
+              <p class="code-lab-caption">The white line stays perpendicular to the transformed surface. The cyan line shows what the shader is actually using.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One local surface frame and one light direction</h3>
+              <p>These bindings define the surface transform, the incoming light, and whether the shader should apply the corrected normal matrix.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Turn the fix off without touching the surface</h3>
+              <p>Change <code>fix_normal_matrix = true</code> to <code>false</code>. The patch itself stays the same while the shading normal drifts away from the correct perpendicular direction.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>The inverse transpose stops feeling mystical</h3>
+              <p>You can read the bug as a code path: transform a direction naively, compare it to the geometric perpendicular, then decide which normal the shader should trust.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Follow the transform first, then the diffuse dot product.</p>
+              </div>
+              <ol id="normal-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the shader-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want the binding story rewritten as shader-side math.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="normal-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Geometric normal</h3>
+              <code id="normal-code-readout-geometry">(0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Shader normal</h3>
+              <code id="normal-code-readout-shader">(0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Light direction</h3>
+              <code id="normal-code-readout-light">(0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Diffuse term</h3>
+              <code id="normal-code-readout-diffuse">0.000</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -248,7 +449,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 3 of 11.</p>
+      <p>Chapter 3 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

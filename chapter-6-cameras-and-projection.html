@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,11 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#camera-compare">Camera shapes</a>
             <a href="#projection-chain">Step by step</a>
+            <a href="#depth-precision">Depth precision</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -72,11 +79,11 @@
             </article>
             <article class="mini-card">
               <h2>Perspective</h2>
-              <p>Objects shrink with distance because the projection divides by depth.</p>
+              <p>Projection rays meet at the eye, so the same-sized object appears smaller as it moves farther away.</p>
             </article>
             <article class="mini-card">
               <h2>Orthographic</h2>
-              <p>Size stays constant with distance, which is useful for diagrams, CAD, and certain stylized games.</p>
+              <p>Projection rays stay parallel, so size stays constant with distance. The result feels more measured than photographic.</p>
             </article>
           </div>
 
@@ -126,6 +133,64 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="camera-compare">
+          <div class="section-header">
+            <p class="eyebrow">Camera Shapes</p>
+            <h2>Perspective uses a frustum. Orthographic uses a box-like volume.</h2>
+            <p>
+              These are not just different formulas. They are different camera models. Perspective has a single eye
+              point and converging rays. Orthographic keeps the rays parallel and the view volume box-shaped.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="camera-compare-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="camera-compare-canvas" class="canvas-stage canvas-stage-wide" aria-label="Perspective versus orthographic camera explainer"></canvas>
+                <p class="canvas-caption">Same three objects, same scene order. Perspective shrinks with depth; orthographic keeps their screen heights aligned.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Perspective starts from an eye point</h3>
+                    <p>All visible points are projected toward the image through one viewpoint, which is why distant objects shrink.</p>
+                  </li>
+                  <li>
+                    <h3>The visible volume is a frustum</h3>
+                    <p>It is wide near the camera direction and expands with depth according to the chosen field of view.</p>
+                  </li>
+                  <li>
+                    <h3>Orthographic keeps projection rays parallel</h3>
+                    <p>The visible volume is more like a box, so objects do not get smaller with distance.</p>
+                  </li>
+                  <li>
+                    <h3>Camera distance and field of view are not the same control</h3>
+                    <p>Moving the camera changes placement. Changing field of view changes the lens. Those can feel similar in framing, but they are not the same visual cause.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Perspective feeling</h2>
+                    <p>Spatial, lens-like, cinematic, and more sensitive to near-camera distortion when the field of view is wide.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Orthographic feeling</h2>
+                    <p>Measured, diagrammatic, and useful when preserving parallel relationships matters more than depth realism.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="projection-chain">
           <div class="section-header">
             <p class="eyebrow">Step by step</p>
@@ -148,7 +213,7 @@
               </li>
               <li>
                 <h3>Map into clip space and divide</h3>
-                <p>After projection, the homogeneous divide turns the 3D coordinates into normalized screen-ready values.</p>
+                <p>After projection, you have a clip-space coordinate. Dividing by <code>w</code> produces normalized device coordinates, which the viewport then maps to pixels.</p>
               </li>
             </ol>
 
@@ -158,6 +223,10 @@
                 <p>Camera motion changes the frame of reference. Projection changes how depth turns into screen size.</p>
               </article>
               <article class="mini-card">
+                <h3>Clip space is not yet the screen</h3>
+                <p>The projection matrix writes a homogeneous clip coordinate. The perspective divide creates NDC, and only the viewport step turns NDC into pixel positions.</p>
+              </article>
+              <article class="mini-card">
                 <h3>Common bug</h3>
                 <p>If the near plane is too close or the far plane too large, depth precision can get worse than you expect.</p>
               </article>
@@ -165,6 +234,65 @@
                 <h3>Why this chapter matters</h3>
                 <p>Once cameras make sense, texture projection, shadow maps, and screen-space effects become easier to organize.</p>
               </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="depth-precision">
+          <div class="section-header">
+            <p class="eyebrow">Depth precision</p>
+            <h2>A near plane that is too close can waste depth precision and make distant surfaces fight</h2>
+            <p>
+              Beginners often treat near and far planes as harmless clipping choices. They are also part of the depth
+              precision story. Perspective depth values are distributed unevenly, so pushing the near plane too close to
+              zero can make distant surfaces numerically harder to separate.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="depth-precision-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="depth-precision-canvas" class="canvas-stage canvas-stage-wide" aria-label="Depth precision and near plane explainer"></canvas>
+                <p class="canvas-caption">A tighter near plane preserves more usable separation for distant depth values. An excessively tiny near plane makes far surfaces crowd together.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Depth values are not spread evenly in perspective projection</h3>
+                    <p>Much more precision is spent near the camera than far away, which is why near-plane choices matter so much.</p>
+                  </li>
+                  <li>
+                    <h3>Bringing the near plane closer changes that distribution</h3>
+                    <p>The farther range gets squeezed more tightly, so two distant surfaces can land on nearly identical stored depths.</p>
+                  </li>
+                  <li>
+                    <h3>That leads to z-fighting</h3>
+                    <p>If two surfaces are close together and the stored depth cannot separate them well, the image may flicker between them.</p>
+                  </li>
+                  <li>
+                    <h3>The fix is usually to tighten the range, especially the near plane</h3>
+                    <p>Good clipping values are not only about visibility. They are also about preserving stable depth comparisons.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Good rule of thumb</h2>
+                    <p>Move the near plane out as far as the scene allows before you reach for more exotic fixes.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>What to watch for</h2>
+                    <p>If distant coplanar or almost-coplanar surfaces shimmer, the problem may be depth precision long before it is a shader bug.</p>
+                  </article>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -211,6 +339,121 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind a camera and a projection mode, then inspect how depth becomes image size</h2>
+            <p>
+              This lab is the code-facing version of the camera comparison. You are binding a camera distance, a lens choice,
+              and an orthographic size, then watching two identical objects project to different screen heights.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="projection-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="projection-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="projection-code-highlight"></code></pre>
+                  <textarea
+                    id="projection-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+perspective = true
+fov = 56
+camera_distance = 4.40
+ortho_height = 1.90</textarea>
+                </div>
+                <p id="projection-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The same geometry projects differently under each camera model</h3>
+                <p>The diagram and screen bars stay linked so you can read size change as a camera/projection effect rather than a scene change.</p>
+              </div>
+              <canvas id="projection-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Projection code lab output"></canvas>
+              <p class="code-lab-caption">Perspective shrinks the farther object. Orthographic keeps the near and far heights matched.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One camera placement and one projection rule</h3>
+              <p>The bindings choose whether projection should be perspective or orthographic, then define the lens or box size that turns depth into screen size.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Flip the camera model without moving the scene</h3>
+              <p>Set <code>perspective = false</code>. The near and far objects should stop changing size relative to each other even though their 3D positions stay put.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>Depth finally has a concrete image consequence</h3>
+              <p>You can read the projection choice as an implementation rule: same world geometry in, different clip-space behavior and different image heights out.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Pay attention to how the projection model changes the near/far size ratio.</p>
+              </div>
+              <ol id="projection-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the projection-shaped output</span>
+                <span class="code-lab-optional-hint">Open this if you want the same camera story as matrix bindings.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="projection-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Mode</h3>
+              <code id="projection-code-readout-mode">perspective</code>
+            </article>
+            <article class="readout-card">
+              <h3>Near object height</h3>
+              <code id="projection-code-readout-near">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Far object height</h3>
+              <code id="projection-code-readout-far">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Near/Far ratio</h3>
+              <code id="projection-code-readout-ratio">0.00x</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -228,7 +471,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Field of view, near plane, far plane, perspective divide, orthographic projection, clip space.</p>
+              <p>Field of view, near plane, far plane, clip space, perspective divide, normalized device coordinates, orthographic projection.</p>
             </article>
           </div>
         </section>
@@ -249,7 +492,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 6 of 11.</p>
+      <p>Chapter 6 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

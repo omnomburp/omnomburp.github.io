@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -43,8 +47,12 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#space-map">Where transforms act</a>
+            <a href="#clip-space">Clip space</a>
             <a href="#journey">Vertex journey</a>
             <a href="#lab">Live lab</a>
+            <a href="#stage-reader">Pipeline reader</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -76,7 +84,7 @@
             </article>
             <article class="mini-card">
               <h2>Clip space</h2>
-              <p>Prepare the visible region for normalization and eventual mapping to screen pixels.</p>
+              <p>The projection output where visibility is tested against <code>w</code>. It is not the same thing as the final screen image.</p>
             </article>
           </div>
 
@@ -90,8 +98,8 @@
               <code>p_view = V p_world</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">View to clip</span>
-              <code>p_clip = P p_view</code>
+              <span class="formula-label">Clip to NDC</span>
+              <code>p_ndc = p_clip / w</code>
             </article>
           </div>
         </section>
@@ -120,9 +128,170 @@
             </article>
             <article class="step-card">
               <span class="step-number">4</span>
-              <h3>Clip space prepares for rasterization</h3>
-              <p>Projection compresses the visible region into the canonical box used before fragments are generated.</p>
+              <h3>Clip space prepares the divide</h3>
+              <p>Projection first produces a homogeneous clip coordinate. Only after dividing by <code>w</code> do you land in normalized device coordinates.</p>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="space-map">
+          <div class="section-header">
+            <p class="eyebrow">Where Transforms Act</p>
+            <h2>Each matrix acts between two spaces, not everywhere at once</h2>
+            <p>
+              A lot of graphics confusion comes from treating positions like one universal thing. They are not. The
+              position keeps changing meaning as each matrix rewrites it into a new space.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="space-map-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="space-map-canvas" class="canvas-stage canvas-stage-wide" aria-label="Space transform map explainer"></canvas>
+                <p class="canvas-caption">The same vertex is redrawn in each space, and the labels show which transform performs each rewrite.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>The model matrix acts on object-space positions</h3>
+                    <p>It takes a vertex from the model’s own local frame and places it into the shared scene.</p>
+                  </li>
+                  <li>
+                    <h3>The view matrix acts on world-space positions</h3>
+                    <p>It rewrites the whole scene relative to the camera, so the eye behaves like the origin.</p>
+                  </li>
+                  <li>
+                    <h3>The projection matrix acts on view-space positions</h3>
+                    <p>Its output is clip space: a homogeneous coordinate that still carries <code>w</code>.</p>
+                  </li>
+                  <li>
+                    <h3>The divide by <code>w</code> is its own step</h3>
+                    <p>No new matrix is applied there. The GPU divides the clip coordinate by <code>w</code> to reach normalized device coordinates.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Good naming habit</h2>
+                    <p>If a variable is named <code>viewPosition</code>, that name should tell you which transforms have already happened and which have not.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Good debugging habit</h2>
+                    <p>When something disappears, ask which step likely pushed it out of the valid region instead of treating the full chain as one black box.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="clip-space">
+          <div class="section-header">
+            <p class="eyebrow">Clip Space</p>
+            <h2>Clip space is a temporary homogeneous checkpoint, not the screen</h2>
+            <p>
+              This is the term that most often gets blurred together with NDC or “screen space.” Clip space is earlier
+              than both. It is the projection output before the perspective divide.
+            </p>
+            <div class="readout-grid clip-story-summary">
+              <article class="readout-card">
+                <h3>View space</h3>
+                <p>The point is camera-relative, but projection has not happened yet.</p>
+                <code>p_view = (x_v, y_v, z_v)</code>
+              </article>
+              <article class="readout-card">
+                <h3>Clip space</h3>
+                <p>Projection has happened. The point is now homogeneous and still carries <code>w</code>.</p>
+                <code>p_clip = (x_c, y_c, z_c, w_c)</code>
+              </article>
+              <article class="readout-card">
+                <h3>NDC</h3>
+                <p>The same point after dividing the clip coordinate by <code>w</code>.</p>
+                <code>p_ndc = p_clip / w_c</code>
+              </article>
+              <article class="readout-card">
+                <h3>Viewport</h3>
+                <p>No new 3D transform here. The GPU maps NDC into pixel coordinates on the screen.</p>
+                <code>pixel = viewport(p_ndc)</code>
+              </article>
+            </div>
+          </div>
+
+          <div class="lesson-explainer" id="clip-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="clip-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Clip space versus normalized device coordinates explainer"></canvas>
+                <p class="canvas-caption">Projection creates clip space. Dividing by <code>w</code> creates NDC. The viewport then maps that normalized box into pixels.</p>
+              </article>
+
+              <div class="readout-grid clip-story-readouts">
+                <article class="readout-card">
+                  <h3>View point</h3>
+                  <code id="clip-story-readout-view">(0.00, 0.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Clip point</h3>
+                  <code id="clip-story-readout-clip">(0.00, 0.00, 0.00, 1.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>NDC point</h3>
+                  <code id="clip-story-readout-ndc">(0.00, 0.00, 0.00)</code>
+                </article>
+                <article class="readout-card">
+                  <h3>Viewport pixel</h3>
+                  <code id="clip-story-readout-pixel">(0, 0)</code>
+                </article>
+              </div>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Projection outputs a homogeneous clip coordinate</h3>
+                    <p>You still have four numbers there, and <code>w</code> is one of the important ones.</p>
+                  </li>
+                  <li>
+                    <h3>Visibility is tested against <code>w</code></h3>
+                    <p>For a point to survive clipping, the clip-space values have to stay inside the range <code>-w</code> to <code>+w</code>.</p>
+                  </li>
+                  <li>
+                    <h3>NDC is the post-divide coordinate</h3>
+                    <p>After dividing by <code>w</code>, the point lands in the fixed <code>[-1, 1]</code> box. That new post-divide value is NDC, not clip space.</p>
+                  </li>
+                  <li>
+                    <h3>The viewport maps NDC to pixels</h3>
+                    <p>Only after the divide does the GPU map the normalized box into actual screen coordinates. The viewport is a screen mapping step, not another 3D transform.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="formula-card">
+                    <span class="formula-label">Clip test</span>
+                    <code>-w <= x_c, y_c, z_c <= w</code>
+                  </article>
+                  <article class="formula-card">
+                    <span class="formula-label">NDC step</span>
+                    <code>p_ndc = p_clip / w</code>
+                  </article>
+                  <article class="formula-card">
+                    <span class="formula-label">Viewport step</span>
+                    <code>pixel = viewport(p_ndc)</code>
+                  </article>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -148,14 +317,18 @@
               </li>
               <li>
                 <h3>Apply projection</h3>
-                <p>Perspective or orthographic projection shapes the visible volume into clip space before normalization.</p>
+                <p>Perspective or orthographic projection shapes the visible volume into clip space. That clip coordinate still carries <code>w</code>. Only after dividing by <code>w</code> do you get normalized device coordinates.</p>
               </li>
             </ol>
 
             <div class="note-stack">
               <article class="mini-card">
                 <h3>The full chain</h3>
-                <p>Most tutorials write this as <code>P * V * M * p</code>. Read it right to left as a sequence of spaces.</p>
+                <p>Most tutorials write this as <code>P * V * M * p_h</code>. Read it right to left as a sequence of spaces ending in a divide by <code>w</code>.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Clip versus NDC</h3>
+                <p>Clip space is the projection output that still carries <code>w</code>. NDC is the new coordinate you get after dividing by <code>w</code>. The viewport then turns NDC into pixels.</p>
               </article>
               <article class="mini-card">
                 <h3>Why names matter</h3>
@@ -172,14 +345,14 @@
         <section class="panel reveal-block" id="lab">
           <div class="section-header">
             <p class="eyebrow">Live lab</p>
-            <h2>Compare the same cube in three different spaces</h2>
+            <h2>Compare object space, world space, and the post-divide NDC view</h2>
           </div>
 
           <div class="lab-copy full-width-copy">
             <p>
               Rotate the model and compare the three views below. The left panel keeps the cube in its own local frame.
               The middle panel shows the cube placed into a world. The right panel shows the projected result in the
-              normalized device coordinate box.
+              normalized device coordinate box after the perspective divide. Clip space happens one step earlier, before that divide by <code>w</code>, so its visible bounds still depend on the point's current <code>w</code> value instead of staying in one fixed box.
             </p>
 
             <div class="controls-grid controls-grid-single">
@@ -208,11 +381,209 @@
             </article>
 
             <article class="mini-canvas-card">
-              <h3>Clip space</h3>
-              <p>The projected coordinates are squeezed into the box used just before screen mapping.</p>
+              <h3>NDC view</h3>
+              <p>This panel shows the projected coordinates after dividing by <code>w</code>, inside the normalized box used just before viewport mapping.</p>
               <div class="canvas-card">
-                <canvas id="space-clip-canvas" class="canvas-stage canvas-stage-compact" aria-label="Clip space demo"></canvas>
+                <canvas id="space-clip-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normalized device coordinate demo"></canvas>
               </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="stage-reader">
+          <div class="section-header">
+            <p class="eyebrow">Pipeline reader</p>
+            <h2>Scrub through the spaces and keep the same vertex in your head</h2>
+            <p>
+              This widget focuses on one vertex instead of one whole mesh. Move the object-space input, then highlight
+              one stage at a time. The numbers change every step, but the meaning changes even more than the numbers do.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Highlighted stage</span>
+                  <input id="space-probe-stage" type="range" min="0" max="4" value="0" />
+                </label>
+                <label class="control">
+                  <span>Object X</span>
+                  <input id="space-probe-x" type="range" min="-120" max="120" value="44" />
+                </label>
+                <label class="control">
+                  <span>Object Y</span>
+                  <input id="space-probe-y" type="range" min="-120" max="120" value="22" />
+                </label>
+                <label class="control">
+                  <span>Object Z</span>
+                  <input id="space-probe-z" type="range" min="-120" max="120" value="54" />
+                </label>
+              </div>
+
+              <article class="mini-card">
+                <h3>Current view</h3>
+                <p><strong id="space-stage-label">Object space</strong></p>
+                <p id="space-stage-note">The vertex still lives in the model’s own local coordinate frame.</p>
+              </article>
+
+              <ul class="bullet-list">
+                <li>Move only the object-space sliders first. That isolates the original input value before any matrix touches it.</li>
+                <li>Scrub from clip space to NDC and watch how dividing by <code>w</code> changes the coordinate even when no new matrix is applied.</li>
+                <li>If a variable name stops matching the highlighted stage, the code is already harder to debug.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="space-probe-canvas" class="canvas-stage canvas-stage-compact" aria-label="Coordinate space pipeline reader"></canvas>
+              <p class="canvas-caption">The highlighted card and canvas stay on one stage at a time so you can separate the coordinate spaces instead of collapsing them together.</p>
+            </div>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card" data-space-stage="0">
+              <h3>Object</h3>
+              <code id="space-readout-object">(0, 0, 0, 1)</code>
+            </article>
+            <article class="readout-card" data-space-stage="1">
+              <h3>World</h3>
+              <code id="space-readout-world">(0, 0, 0, 1)</code>
+            </article>
+            <article class="readout-card" data-space-stage="2">
+              <h3>View</h3>
+              <code id="space-readout-view">(0, 0, 0, 1)</code>
+            </article>
+            <article class="readout-card" data-space-stage="3">
+              <h3>Clip</h3>
+              <code id="space-readout-clip">(0, 0, 0, 1)</code>
+            </article>
+            <article class="readout-card" data-space-stage="4">
+              <h3>NDC</h3>
+              <code id="space-readout-ndc">(0, 0, 0, 1)</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind a vertex, a model transform, and a projection, then inspect every stage</h2>
+            <p>
+              This is the code-facing version of the pipeline reader. The lines below describe what a render setup would
+              bind before the vertex shader runs. The output shows how those bindings lower into <code>uModel</code>,
+              <code>uView</code>, <code>uProjection</code>, clip coordinates, and the final NDC value.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="spaces-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="spaces-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="spaces-code-highlight"></code></pre>
+                  <textarea
+                    id="spaces-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+object = vec3(0.88, 0.44, 1.08)
+model_translate = vec3(1.20, -0.18, -0.70)
+model_rotate_y = 32
+fov = 52</textarea>
+                </div>
+                <p id="spaces-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>One vertex walks the full pipeline in public</h3>
+                <p>The same bound input is redrawn through object, world, view, clip, and NDC so the code reads like a visible pipeline.</p>
+              </div>
+              <canvas id="spaces-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Coordinate spaces code lab output"></canvas>
+              <p class="code-lab-caption">Each stage box is showing the same vertex after a different part of the pipeline has reinterpreted it.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are binding</p>
+              <h3>A vertex plus the matrices that reinterpret it</h3>
+              <p>The editor is declaring one object-space vertex and the matrix inputs that decide where it will land in world, view, clip, and NDC space.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Change distance and lens separately</h3>
+              <p>Push <code>model_translate.z</code> farther back or narrow <code>fov</code>. Watch how the clip coordinate and NDC value respond differently.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>The matrix chain becomes readable code flow</h3>
+              <p>You can now read a matrix chain as actual code flow: bind values on the CPU, multiply in the vertex shader, divide by <code>w</code>, then map to pixels.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Read this first. It is the pipeline story you should keep in your head.</p>
+              </div>
+              <ol id="spaces-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the shader-shaped output</span>
+                <span class="code-lab-optional-hint">Open this only if you want the WebGL-flavored version of the same pipeline.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="spaces-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Object</h3>
+              <code id="spaces-code-readout-object">(0.00, 0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>World</h3>
+              <code id="spaces-code-readout-world">(0.00, 0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>View</h3>
+              <code id="spaces-code-readout-view">(0.00, 0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Clip</h3>
+              <code id="spaces-code-readout-clip">(0.00, 0.00, 0.00, 1.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>NDC</h3>
+              <code id="spaces-code-readout-ndc">(0.00, 0.00, 0.00)</code>
+            </article>
+            <article class="readout-card">
+              <h3>Viewport pixel</h3>
+              <code id="spaces-code-readout-pixel">(0, 0)</code>
             </article>
           </div>
         </section>
@@ -234,7 +605,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Vocabulary to keep</h3>
-              <p>Object space, world space, view space, clip space, normalized device coordinates, projection.</p>
+              <p>Object space, world space, view space, clip space, perspective divide, normalized device coordinates, viewport mapping, projection.</p>
             </article>
           </div>
         </section>
@@ -255,7 +626,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 2 of 11.</p>
+      <p>Chapter 2 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

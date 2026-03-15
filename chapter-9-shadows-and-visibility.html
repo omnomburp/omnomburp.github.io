@@ -27,6 +27,10 @@
           <a class="is-current" href="chapter-9-shadows-and-visibility.html" aria-current="page">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a href="chapter-11-color-tone-mapping-and-post-processing.html">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -44,7 +48,10 @@
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
             <a href="#shadow-map">Shadow map workflow</a>
+            <a href="#light-space">Light space</a>
             <a href="#artifacts">Artifacts</a>
+            <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -168,6 +175,65 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="light-space">
+          <div class="section-header">
+            <p class="eyebrow">Light space</p>
+            <h2>A shadow lookup only works after the world point is rewritten into the light’s own camera</h2>
+            <p>
+              The step that most often gets hand-waved is the coordinate rewrite itself. The fragment you are shading starts
+              as a world-space position. To ask whether the light can see it, that same point has to be expressed in the light’s
+              view and projection so it lands on one shadow-map texel.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="light-space-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="light-space-canvas" class="canvas-stage canvas-stage-wide" aria-label="World to light space shadow lookup explainer"></canvas>
+                <p class="canvas-caption">The same world point becomes a light-space coordinate, then a shadow-map UV sample, before the depth comparison can even begin.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>Start from the fragment’s world position</h3>
+                    <p>The camera may see the point already, but the shadow question is about whether the light can see it too.</p>
+                  </li>
+                  <li>
+                    <h3>Transform that point into light view space</h3>
+                    <p>This rewrites the scene relative to the light so the blocker test uses the light’s frame of reference.</p>
+                  </li>
+                  <li>
+                    <h3>Project into the light’s clip and NDC space</h3>
+                    <p>Now the point can be mapped into normalized light coordinates instead of world coordinates.</p>
+                  </li>
+                  <li>
+                    <h3>Map into shadow-map UV and compare stored depth</h3>
+                    <p>Only after that rewrite does the point know which shadow texel to sample and which stored depth it must beat.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Good debugging move</h2>
+                    <p>If a shadow is wrong, inspect the light-space coordinate directly before you blame bias or filtering.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Why this is hard</h2>
+                    <p>The same point is being interpreted by two cameras at once: the eye camera for visibility on screen and the light camera for visibility to the light.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="artifacts">
           <div class="section-header">
             <p class="eyebrow">Artifact notebook</p>
@@ -201,6 +267,164 @@
             <article class="mini-card">
               <h3>What comes next</h3>
               <p>Ray tracing attacks the same visibility question differently, by shooting rays through the scene instead of projecting triangles onto the screen.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lab">
+          <div class="section-header">
+            <p class="eyebrow">Live lab</p>
+            <h2>Push bias and shadow-map resolution until the failure mode becomes obvious</h2>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                This lab simplifies the scene so you can isolate the three classic shadow-map problems. Low bias causes self-shadowing acne.
+                High bias pulls the shadow away from the blocker. Low resolution makes the edge chunky. Soft filtering smooths that edge,
+                but it does not remove the need for good bias and enough shadow-map samples.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Bias</span>
+                  <input id="shadow-bias" type="range" min="0" max="100" value="24" />
+                </label>
+                <label class="control">
+                  <span>Map resolution</span>
+                  <input id="shadow-resolution" type="range" min="8" max="96" value="28" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Soft filter</span>
+                  <input id="shadow-filter" type="checkbox" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Pull bias close to zero first. Notice the noisy dark speckling where the surface starts shadowing itself.</li>
+                <li>Raise bias too far and watch the shadow detach from the blocker. That is peter-panning.</li>
+                <li>Drop the map resolution and compare the chunky edge with and without the soft filter toggle.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="shadow-canvas" class="canvas-stage" aria-label="Shadow map artifact demo"></canvas>
+              <p class="canvas-caption">The same visibility test can fail three different ways: self-shadowing, detached shadows, or blocky edges.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind a receiver depth and a bias, then inspect the actual shadow comparison</h2>
+            <p>
+              This lab strips the problem down to the part that often goes wrong. You are binding a stored light-space depth,
+              a receiver depth, a bias, and an optional soft filter, then watching the comparison decide how much direct light survives.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="shadow-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="shadow-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="shadow-code-highlight"></code></pre>
+                  <textarea
+                    id="shadow-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+shadow_map_depth = 0.44
+receiver_depth = 0.47
+bias = 0.02
+soft_filter = true</textarea>
+                </div>
+                <p id="shadow-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The shadow test is just a depth comparison with consequences</h3>
+                <p>The bars, adjusted depth line, and lighting swatch stay linked so you can see exactly when a receiver flips from lit to shadowed.</p>
+              </div>
+              <canvas id="shadow-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Shadow compare code lab output"></canvas>
+              <p class="code-lab-caption">Bias changes the receiver depth before the compare. Soft filtering averages several nearby shadow tests.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One stored light sample and one receiver test</h3>
+              <p>The bindings define what the light remembered, where the current surface lands relative to that memory, and how much bias or filtering the compare should use.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Let the receiver sit almost on top of the stored depth</h3>
+              <p>Lower <code>bias</code> toward zero while keeping <code>receiver_depth</code> close to <code>shadow_map_depth</code>. The compare should become fragile in exactly the way that produces acne.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>Shadow bugs become concrete instead of mysterious</h3>
+              <p>You can inspect the exact numbers that drive the decision, which makes it much easier to understand why too little bias or too much bias causes different artifacts.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Focus on the moment the adjusted receiver depth crosses above the stored light depth.</p>
+              </div>
+              <ol id="shadow-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the shadow-test output</span>
+                <span class="code-lab-optional-hint">Open this if you want the same comparison written like shader-side depth logic.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="shadow-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Adjusted depth</h3>
+              <code id="shadow-code-readout-adjusted">0.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Stored depth</h3>
+              <code id="shadow-code-readout-stored">0.000</code>
+            </article>
+            <article class="readout-card">
+              <h3>Shadow factor</h3>
+              <code id="shadow-code-readout-shadow">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Lighting state</h3>
+              <code id="shadow-code-readout-state">lit</code>
             </article>
           </div>
         </section>
@@ -243,7 +467,7 @@
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 9 of 11.</p>
+      <p>Chapter 9 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

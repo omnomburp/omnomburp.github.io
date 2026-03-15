@@ -27,6 +27,10 @@
           <a href="chapter-9-shadows-and-visibility.html">9 Shadows</a>
           <a href="chapter-10-ray-tracing-and-rasterization.html">10 Ray Tracing</a>
           <a class="is-current" href="chapter-11-color-tone-mapping-and-post-processing.html" aria-current="page">11 Color</a>
+          <a href="chapter-12-transparency-antialiasing-and-compositing.html">12 Transparency</a>
+          <a href="chapter-13-physically-based-rendering-and-image-based-lighting.html">13 PBR</a>
+          <a href="chapter-14-animation-hierarchies-and-skinning.html">14 Animation</a>
+          <a href="chapter-15-acceleration-culling-and-level-of-detail.html">15 Acceleration</a>
         </div>
       </nav>
     </header>
@@ -36,15 +40,17 @@
         <section class="aside-card">
           <p class="eyebrow">Chapter 11</p>
           <p class="sidebar-title">Color, tone mapping, and post-processing</p>
-          <p>This final chapter explains why a physically sensible render can still look wrong if the image is displayed or processed incorrectly.</p>
+          <p>This chapter explains why a physically sensible render can still look wrong if the image is displayed or processed incorrectly.</p>
         </section>
 
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#display-story">Display story</a>
             <a href="#pipeline">Step by step</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Guided code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -61,7 +67,8 @@
           <h1 class="page-title">Rendering does not end when the shader writes a bright value</h1>
           <p class="lede">
             The GPU may compute values that are brighter than a display can show directly. Tone mapping compresses those values
-            into a viewable range. Gamma correction makes sure the final values are encoded for how displays actually respond.
+            into a viewable range. A final display-encoding step, often approximated with gamma correction in beginner examples,
+            makes sure the final values are prepared for how real displays respond.
             Post-processing then adds finishing passes like bloom, color grading, or vignette.
           </p>
 
@@ -75,8 +82,8 @@
               <p>Compresses HDR-like values into the limited range the display can show.</p>
             </article>
             <article class="mini-card">
-              <h2>Gamma correction</h2>
-              <p>Transforms the final image so the displayed brightness feels visually correct on the screen.</p>
+              <h2>Display encoding</h2>
+              <p>Often taught as a gamma step, but in practice usually handled with an sRGB or other display transfer function.</p>
             </article>
           </div>
 
@@ -90,7 +97,7 @@
               <code>mapped = color / (1 + color)</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Gamma encode</span>
+              <span class="formula-label">Display encode (approx.)</span>
               <code>display = pow(mapped, 1 / gamma)</code>
             </article>
           </div>
@@ -120,9 +127,68 @@
             </article>
             <article class="step-card">
               <span class="step-number">4</span>
-              <h3>Gamma correction is the final display handshake</h3>
+              <h3>Display encoding is the final display handshake</h3>
               <p>Without it, the image can look too dark or perceptually wrong even if the scene math was fine.</p>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="display-story">
+          <div class="section-header">
+            <p class="eyebrow">Display story</p>
+            <h2>The same light values look different in a linear buffer, after tone mapping, and after display encoding</h2>
+            <p>
+              These terms are easy to blur together because they all happen near the end of the pipeline. They are not the
+              same operation. One is about physically meaningful working values, one is about range compression, and one is
+              about matching the display.
+            </p>
+          </div>
+
+          <div class="lesson-explainer" id="display-story-explainer">
+            <div class="lesson-explainer-shell">
+              <div class="explainer-toolbar">
+                <div class="explainer-toolbar-copy">
+                  <p class="eyebrow">Visual explainer</p>
+                </div>
+              </div>
+
+              <article class="canvas-card explainer-stage-card">
+                <canvas id="display-story-canvas" class="canvas-stage canvas-stage-wide" aria-label="Linear color to display pipeline explainer"></canvas>
+                <p class="canvas-caption">The samples are the same light story in every panel. What changes is how they are prepared for a limited display.</p>
+              </article>
+
+              <div class="story-copy">
+                <ol class="walkthrough-list">
+                  <li>
+                    <h3>The linear working image may contain values above <code>1.0</code></h3>
+                    <p>That is normal when a highlight is much brighter than the surrounding image. The renderer is still describing light, not yet a monitor-ready picture.</p>
+                  </li>
+                  <li>
+                    <h3>Tone mapping compresses that wide range into something viewable</h3>
+                    <p>It keeps bright areas feeling brighter while preventing them from clipping as harshly as a raw display clamp would.</p>
+                  </li>
+                  <li>
+                    <h3>Display encoding reshapes the final values for the screen</h3>
+                    <p>In this course that is shown as a simple gamma-style step, but real pipelines often target a proper sRGB transfer instead of a pure power curve.</p>
+                  </li>
+                  <li>
+                    <h3>Post-processing usually belongs before the final display handoff</h3>
+                    <p>Bloom, grading, and similar passes are easier to reason about while the image is still in a controlled working space.</p>
+                  </li>
+                </ol>
+
+                <div class="goal-grid story-note-grid">
+                  <article class="mini-card">
+                    <h2>Good mental split</h2>
+                    <p>Linear is for light math. Tone mapping is for fitting range. Display encoding is for the monitor.</p>
+                  </article>
+                  <article class="mini-card">
+                    <h2>Why images look washed out</h2>
+                    <p>A bug in any one of those three stages can make the final result look wrong even if the geometry and shading are both correct.</p>
+                  </article>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -158,6 +224,10 @@
                 <p>It helps very bright highlights feel intense even after tone mapping compresses the numerical range.</p>
               </article>
               <article class="mini-card">
+                <h3>Simple gamma is not the whole story</h3>
+                <p>This chapter uses a power curve because it is easy to see. Production pipelines often target an sRGB transfer or another display-specific encoding rather than a pure <code>pow</code> step.</p>
+              </article>
+              <article class="mini-card">
                 <h3>Why this chapter is last</h3>
                 <p>You need the earlier pipeline in your head before it becomes clear that final image presentation is its own discipline.</p>
               </article>
@@ -179,7 +249,8 @@
             <div class="lab-copy">
               <p>
                 The shader below generates bright highlights and a glowing sky in linear-like space. Use the sliders to see how exposure,
-                tone mapping, and gamma each change the final displayed image. This is not about geometry anymore. It is about image preparation.
+                tone mapping, and gamma each change the final displayed image. This demo uses a simple power-law control so the separation
+                between tone mapping and display encoding stays easy to see. This is not about geometry anymore. It is about image preparation.
               </p>
 
               <div class="controls-grid">
@@ -211,10 +282,125 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Bind exposure and display settings, then inspect the frame as it moves toward the monitor</h2>
+            <p>
+              This lab turns the end of the pipeline into editable bindings. You are choosing scene brightness, exposure,
+              whether tone mapping is active, and the display gamma, then watching the same samples move through three distinct stages.
+            </p>
+          </div>
+
+          <div class="code-lab-layout">
+            <div class="code-lab-column">
+              <div class="code-lab-shell">
+                <div class="editor-toolbar">
+                  <p class="sidebar-label">Lesson code</p>
+                  <div class="editor-actions">
+                    <button class="editor-button" id="color-code-run" type="button">Run code</button>
+                    <button class="editor-button editor-button-ghost" id="color-code-reset" type="button">Reset</button>
+                  </div>
+                </div>
+
+                <div class="code-editor-frame">
+                  <pre class="code-editor-highlight" aria-hidden="true"><code id="color-code-highlight"></code></pre>
+                  <textarea
+                    id="color-code-input"
+                    class="code-editor-input"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    wrap="off"
+                  ># Python-like lesson bindings
+exposure = 1.0
+scene_peak = 3.8
+tone_map = true
+gamma = 2.2</textarea>
+                </div>
+                <p id="color-code-status" class="code-status">Press Run or use Cmd/Ctrl+Enter to apply changes.</p>
+              </div>
+            </div>
+
+            <article class="canvas-card code-lab-preview">
+              <div class="code-lab-preview-copy">
+                <p class="sidebar-label">Live output</p>
+                <h3>The frame changes shape as it moves from linear light to display values</h3>
+                <p>The three panels stay linked so you can read exposure, tone mapping, and display encoding as separate responsibilities instead of one blurred finishing step.</p>
+              </div>
+              <canvas id="color-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Color pipeline code lab output"></canvas>
+              <p class="code-lab-caption">Linear values can exceed the display range. Tone mapping and display encoding prepare that signal for the monitor in different ways.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-notes">
+            <article class="code-lab-note">
+              <p class="sidebar-label">What you are editing</p>
+              <h3>One working image and one display handoff</h3>
+              <p>The bindings set how bright the scene gets before display preparation, whether range compression is active, and how the final encoded image should be shaped for the screen.</p>
+            </article>
+
+            <article class="code-lab-note code-lab-note-accent">
+              <p class="sidebar-label">Try this next</p>
+              <h3>Push the scene peak high, then remove tone mapping</h3>
+              <p>Set <code>scene_peak = 6.0</code> and <code>tone_map = false</code>. The linear values should outrun the display range and clamp much more harshly.</p>
+            </article>
+
+            <article class="code-lab-note">
+              <p class="sidebar-label">Why this helps</p>
+              <h3>Color finishing becomes a pipeline instead of a vague post effect</h3>
+              <p>You can see that exposure changes the working light values, tone mapping compresses range, and gamma or display encoding reshapes the final monitor response after that.</p>
+            </article>
+          </div>
+
+          <div class="code-lab-breakdown">
+            <article class="mini-card code-lab-panel-card">
+              <div class="code-lab-panel-header">
+                <div>
+                  <p class="sidebar-label">Core flow</p>
+                  <h3>How this lowers</h3>
+                </div>
+                <p class="code-lab-panel-note">Keep the three stages mentally separate: working light, range fit, then display handoff.</p>
+              </div>
+              <ol id="color-code-steps" class="code-step-list"></ol>
+            </article>
+
+            <details class="code-lab-optional">
+              <summary>
+                <span>Optional: peek at the post-process output</span>
+                <span class="code-lab-optional-hint">Open this if you want the lesson bindings written as a simple post-processing pass.</span>
+              </summary>
+              <div class="code-lab-optional-body">
+                <pre class="code-block code-block-compact"><code id="color-code-lowered"></code></pre>
+              </div>
+            </details>
+          </div>
+
+          <div class="readout-grid">
+            <article class="readout-card">
+              <h3>Linear peak</h3>
+              <code id="color-code-readout-linear">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Mapped peak</h3>
+              <code id="color-code-readout-mapped">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Display peak</h3>
+              <code id="color-code-readout-display">0.00</code>
+            </article>
+            <article class="readout-card">
+              <h3>Pipeline mode</h3>
+              <code id="color-code-readout-mode">tone mapped</code>
+            </article>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
-            <h2>What should stay with you after the full course</h2>
+            <h2>What should stay with you before the advanced track</h2>
           </div>
 
           <div class="callout-grid">
@@ -228,7 +414,7 @@
             </article>
             <article class="checkpoint-card">
               <h3>Where to go next</h3>
-              <p>Physically based rendering, image-based lighting, temporal antialiasing, shadow filtering, and path tracing are all natural next topics.</p>
+              <p>The next four chapters pick up exactly here: transparency and compositing, physically based rendering, animation and skinning, then acceleration and level of detail.</p>
             </article>
           </div>
         </section>
@@ -239,17 +425,17 @@
             <strong>Ray tracing and rasterization</strong>
             <p>Return to the rendering methods whose output still needs to be prepared for display.</p>
           </a>
-          <a class="page-link-card" href="index.html">
-            <span class="page-direction">Again</span>
-            <strong>Course overview</strong>
-            <p>Loop back through the course with the full pipeline now in mind.</p>
+          <a class="page-link-card" href="chapter-12-transparency-antialiasing-and-compositing.html">
+            <span class="page-direction">Next</span>
+            <strong>Transparency, antialiasing, and compositing</strong>
+            <p>Continue into the first advanced chapter, where draw order and coverage start to matter explicitly.</p>
           </a>
         </nav>
       </article>
     </main>
 
     <footer class="site-footer">
-      <p>Chapter 11 of 11.</p>
+      <p>Chapter 11 of 15.</p>
     </footer>
 
     <script src="app.js"></script>

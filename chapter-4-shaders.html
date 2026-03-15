@@ -48,6 +48,7 @@
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
             <a href="#stage-split">Stage split</a>
+            <a href="#shader-uses">More uses</a>
             <a href="#data-path">Data path</a>
             <a href="#lab">Live lab</a>
             <a href="#gpu-simulation">GPU simulation</a>
@@ -176,6 +177,55 @@ fragment shader
                 <p>Patterns and lighting belong here because they need high spatial detail across the surface.</p>
               </li>
             </ol>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="shader-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>Keep seeing the same shader data roles in different tasks</h2>
+            <p>
+              Shader code becomes readable once attributes, uniforms, varyings, and stage ownership stop feeling like
+              vocabulary words and start feeling like specific jobs. These examples repeat that split visually.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Vertex work changes the mesh itself</h3>
+              <div class="canvas-card">
+                <canvas id="shader-vertex-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Vertex stage deformation example"></canvas>
+              </div>
+              <p>If you move positions here, the triangle shape changes before rasterization ever begins.</p>
+              <p class="card-code"><code>pos.y += wave(pos.x, uTime)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Fragment work adds surface detail after shape is decided</h3>
+              <div class="canvas-card">
+                <canvas id="shader-fragment-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Fragment stage pattern example"></canvas>
+              </div>
+              <p>The mesh can stay flat while the visible pattern gets richer, because the fragment shader runs on covered samples.</p>
+              <p class="card-code"><code>color = stripes(vUv)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Uniforms stay shared across the whole draw</h3>
+              <div class="canvas-card">
+                <canvas id="shader-uniform-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Uniform shared value example"></canvas>
+              </div>
+              <p>One time value or one light direction can push every vertex or fragment in the draw call the same way.</p>
+              <p class="card-code"><code>uniform float uTime;</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Varyings are the bridge between stages</h3>
+              <div class="canvas-card">
+                <canvas id="shader-varying-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Varying interpolation example"></canvas>
+              </div>
+              <p>Vertices hand values forward, rasterization blends them, and the fragment shader receives the interpolated result.</p>
+              <p class="card-code"><code>vColor -&gt; fragment</code></p>
+            </article>
           </div>
         </section>
 

@@ -48,6 +48,7 @@
           <div class="outline-list">
             <a href="#game-lighting">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#normal-uses">More uses</a>
             <a href="#lighting-logic">Lighting logic</a>
             <a href="#lab">Live lab</a>
             <a href="#meter">Alignment meter</a>
@@ -199,6 +200,56 @@
               <span class="step-number">4</span>
               <h3>Interpolated normals smooth the look</h3>
               <p>Normals can vary across a triangle, which makes a faceted mesh appear smoothly shaded.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="normal-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>Reuse normals in several concrete graphics decisions</h2>
+            <p>
+              A normal is more than “the arrow lighting uses.” The same direction data keeps showing up in diffuse
+              response, facing tests, face construction, and shading style. Seeing those together makes the chapter
+              much harder to forget.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Diffuse lighting is just alignment</h3>
+              <div class="canvas-card">
+                <canvas id="normal-dot-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Diffuse alignment example"></canvas>
+              </div>
+              <p>When the light arrow and the normal arrow line up, the patch gets brighter. That is the same <code>dot(n, l)</code> you will see in shader code.</p>
+              <p class="card-code"><code>diffuse = max(dot(n, l), 0)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Facing the camera is another dot test</h3>
+              <div class="canvas-card">
+                <canvas id="normal-facing-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Normal facing camera example"></canvas>
+              </div>
+              <p>The surface can be front-facing or back-facing relative to the view direction long before any material shading happens.</p>
+              <p class="card-code"><code>dot(n, viewDir)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Triangle normals come from edges</h3>
+              <div class="canvas-card">
+                <canvas id="normal-cross-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Cross product to face normal example"></canvas>
+              </div>
+              <p>A mesh face does not magically know its orientation. Two edge vectors can build the perpendicular direction explicitly.</p>
+              <p class="card-code"><code>n = normalize(cross(e1, e2))</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Shading style depends on which normal you feed forward</h3>
+              <div class="canvas-card">
+                <canvas id="normal-smooth-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Smooth versus faceted normals example"></canvas>
+              </div>
+              <p>One face normal gives a faceted look. Interpolated vertex normals make the same coarse mesh read as smoothly shaded.</p>
+              <p class="card-code"><code>vNormal -&gt; fragment</code></p>
             </article>
           </div>
         </section>

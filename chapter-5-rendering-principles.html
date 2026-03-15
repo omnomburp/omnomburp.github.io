@@ -47,6 +47,7 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#pipeline">Mental model</a>
+            <a href="#rendering-uses">More uses</a>
             <a href="#triangle-story">Triangle story</a>
             <a href="#visibility-story">Visibility story</a>
             <a href="#frame">Frame walkthrough</a>
@@ -129,6 +130,55 @@
               <span class="step-number">4</span>
               <h3>Color needs context</h3>
               <p>Materials, lighting, tone mapping, and display space all influence the final image that reaches the eye.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="rendering-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>Repeat the frame story as several tiny render decisions</h2>
+            <p>
+              Rendering feels large because many small decisions happen quickly. Breaking the frame into compact examples
+              helps you recognize the same logic when the full pipeline starts to feel busy.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Coverage depends on sample positions</h3>
+              <div class="canvas-card">
+                <canvas id="render-coverage-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Pixel coverage example"></canvas>
+              </div>
+              <p>The rasterizer is not guessing which pixels are “kind of inside.” It tests actual sample locations against triangle coverage.</p>
+              <p class="card-code"><code>covered(sampleCenter)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Interpolated values come from triangle weights</h3>
+              <div class="canvas-card">
+                <canvas id="render-barycentric-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Barycentric interpolation example"></canvas>
+              </div>
+              <p>One fragment inherits a blend of the vertex data, which is why colors, UVs, and normals can vary smoothly inside a face.</p>
+              <p class="card-code"><code>v = a*A + b*B + c*C</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Depth keeps the front-most winner</h3>
+              <div class="canvas-card">
+                <canvas id="render-depth-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Depth winner example"></canvas>
+              </div>
+              <p>Two surfaces can want the same pixel. The depth test decides which fragment actually gets to update the frame buffer.</p>
+              <p class="card-code"><code>if (z &lt; zBuffer) write</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Sampling turns discrete texture data into a visible color</h3>
+              <div class="canvas-card">
+                <canvas id="render-sampling-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Texture sampling example"></canvas>
+              </div>
+              <p>The source texture is a grid, but the renderer still has to answer “what color should this one fragment receive?”</p>
+              <p class="card-code"><code>color = texture(tex, uv)</code></p>
             </article>
           </div>
         </section>

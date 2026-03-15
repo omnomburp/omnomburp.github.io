@@ -4181,6 +4181,317 @@ function setupGameNormalsStoryDemo() {
   });
 }
 
+function setupNormalDotUseDemo() {
+  const canvas = document.getElementById("normal-dot-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.06 : time * 0.86;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const center = [rect.x + rect.width * 0.5, rect.y + rect.height * 0.58];
+      const normal = normalize2([Math.sin(phase * 0.74) * 0.3, 1]);
+      const light = normalize2([Math.cos(phase * 0.92), 0.28 + Math.sin(phase * 0.62) * 0.86]);
+      const diffuse = clamp(dot2(normal, light), 0, 1);
+      const patchW = rect.width * 0.44;
+      const patchH = rect.height * 0.22;
+      const fontSize = Math.max(10, width * 0.013);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#183243");
+      drawLessonCanvasPanel(ctx, rect, "Diffuse patch", width);
+
+      const patchGradient = ctx.createLinearGradient(
+        center[0] - patchW * 0.5,
+        center[1] - patchH * 0.5,
+        center[0] + patchW * 0.5,
+        center[1] + patchH * 0.5
+      );
+      patchGradient.addColorStop(0, rgbToCss([0.14 + diffuse * 0.2, 0.34 + diffuse * 0.22, 0.46 + diffuse * 0.18]));
+      patchGradient.addColorStop(1, rgbToCss([0.22 + diffuse * 0.5, 0.54 + diffuse * 0.24, 0.7 + diffuse * 0.16]));
+      ctx.fillStyle = patchGradient;
+      ctx.fillRect(center[0] - patchW * 0.5, center[1] - patchH * 0.5, patchW, patchH);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0024);
+      ctx.strokeRect(center[0] - patchW * 0.5, center[1] - patchH * 0.5, patchW, patchH);
+
+      const normalTip = [center[0] + normal[0] * patchH * 1.5, center[1] - normal[1] * patchH * 1.5];
+      const lightTip = [center[0] + light[0] * patchW * 0.42, center[1] - light[1] * patchH * 1.8];
+      drawArrow2d(ctx, center, normalTip, "rgba(239, 245, 247, 0.96)", Math.max(2, width * 0.003));
+      drawArrow2d(ctx, center, lightTip, "rgba(247, 160, 74, 0.94)", Math.max(2, width * 0.003));
+      drawCanvasChip(ctx, "n", normalTip[0] + 12, normalTip[1] - 12, {
+        fontSize,
+        color: "rgba(239, 245, 247, 0.98)",
+      });
+      drawCanvasChip(ctx, "l", lightTip[0] + 12, lightTip[1] - 12, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, `dot ${formatNumber(diffuse, 2)}`, rect.x + rect.width - 12, rect.y + 16, {
+        align: "right",
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupNormalFacingUseDemo() {
+  const canvas = document.getElementById("normal-facing-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.08 : time * 0.82;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const center = [rect.x + rect.width * 0.58, rect.y + rect.height * 0.58];
+      const camera = [rect.x + rect.width * 0.18, rect.y + rect.height * 0.34];
+      const viewDir = normalize2([(camera[0] - center[0]) / 120, (center[1] - camera[1]) / 120]);
+      const angle = 0.4 + Math.sin(phase * 0.88) * 1.45;
+      const tangent = [Math.cos(angle), Math.sin(angle)];
+      const normal = normalize2(perpendicular2(tangent));
+      const facing = dot2(normal, viewDir);
+      const isFront = facing > 0;
+      const patchColor = isFront ? "rgba(115, 221, 213, 0.24)" : "rgba(247, 160, 74, 0.24)";
+      const patchStroke = isFront ? "rgba(115, 221, 213, 0.94)" : "rgba(247, 160, 74, 0.94)";
+      const fontSize = Math.max(10, width * 0.013);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#183243");
+      drawLessonCanvasPanel(ctx, rect, "Facing test", width);
+
+      drawCameraGlyph(ctx, camera, 0.1, Math.max(8, width * 0.011), "rgba(255, 223, 132, 0.92)");
+      drawArrow2d(ctx, center, camera, "rgba(255, 223, 132, 0.78)", Math.max(1.8, width * 0.0028));
+
+      ctx.save();
+      ctx.translate(center[0], center[1]);
+      ctx.rotate(angle);
+      ctx.fillStyle = patchColor;
+      ctx.strokeStyle = patchStroke;
+      ctx.lineWidth = Math.max(2, width * 0.003);
+      ctx.fillRect(-rect.width * 0.18, -rect.height * 0.08, rect.width * 0.36, rect.height * 0.16);
+      ctx.strokeRect(-rect.width * 0.18, -rect.height * 0.08, rect.width * 0.36, rect.height * 0.16);
+      ctx.restore();
+
+      const normalTip = [center[0] + normal[0] * rect.width * 0.18, center[1] - normal[1] * rect.height * 0.18];
+      drawArrow2d(ctx, center, normalTip, "rgba(239, 245, 247, 0.96)", Math.max(2, width * 0.003));
+      drawCanvasChip(ctx, isFront ? "front" : "back", rect.x + rect.width - 12, rect.y + 16, {
+        align: "right",
+        fontSize,
+        color: isFront ? "rgba(115, 221, 213, 0.98)" : "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "view", camera[0] + 10, camera[1] - 12, {
+        fontSize,
+        color: "rgba(255, 223, 132, 0.98)",
+      });
+      drawCanvasChip(ctx, "n", normalTip[0] + 12, normalTip[1] - 12, {
+        fontSize,
+        color: "rgba(239, 245, 247, 0.98)",
+      });
+    },
+  });
+}
+
+function setupNormalCrossUseDemo() {
+  const canvas = document.getElementById("normal-cross-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.1 : time * 0.78;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const extentX = 2.7;
+      const extentY = 2.2;
+      const pointA = [-1.0, -0.62, -0.18];
+      const pointB = [1.22, -0.18, 0.1 + Math.sin(phase * 0.72) * 0.2];
+      const pointC = [-0.16, 0.98 + Math.cos(phase * 0.66) * 0.14, 0.76 + Math.sin(phase * 0.84) * 0.2];
+      const edge1 = subtract3(pointB, pointA);
+      const edge2 = subtract3(pointC, pointA);
+      let normal = normalize3(cross3(edge1, edge2));
+      if (dot3(normal, normalize3([0.26, 0.38, 1])) < 0) {
+        normal = scale3(normal, -1);
+      }
+      const center = [
+        (pointA[0] + pointB[0] + pointC[0]) / 3,
+        (pointA[1] + pointB[1] + pointC[1]) / 3,
+        (pointA[2] + pointB[2] + pointC[2]) / 3,
+      ];
+      const tip = add3(center, scale3(normal, 0.9));
+      const fontSize = Math.max(10, width * 0.013);
+
+      function project3(point) {
+        return projectRectPoint(rect, [point[0] * 0.92 - point[2] * 0.56, point[1] * 0.88 + point[0] * 0.16 + point[2] * 0.28], extentX, extentY, 16, 20, 0.6);
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#183243");
+      drawLessonCanvasPanel(ctx, rect, "Face normal", width);
+      drawRectAxesGrid(ctx, rect, extentX, extentY, width, 0.6);
+
+      const aCanvas = project3(pointA);
+      const bCanvas = project3(pointB);
+      const cCanvas = project3(pointC);
+      const centerCanvas = project3(center);
+      const tipCanvas = project3(tip);
+      ctx.fillStyle = "rgba(115, 221, 213, 0.18)";
+      ctx.strokeStyle = "rgba(214, 248, 245, 0.92)";
+      ctx.lineWidth = Math.max(1.8, width * 0.0028);
+      ctx.beginPath();
+      ctx.moveTo(aCanvas[0], aCanvas[1]);
+      ctx.lineTo(bCanvas[0], bCanvas[1]);
+      ctx.lineTo(cCanvas[0], cCanvas[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      drawArrow2d(ctx, aCanvas, bCanvas, "rgba(247, 160, 74, 0.96)", Math.max(2, width * 0.003));
+      drawArrow2d(ctx, aCanvas, cCanvas, "rgba(115, 221, 213, 0.96)", Math.max(2, width * 0.003));
+      drawArrow2d(ctx, centerCanvas, tipCanvas, "rgba(239, 245, 247, 0.96)", Math.max(2.1, width * 0.003));
+      drawCanvasChip(ctx, "e1", (aCanvas[0] + bCanvas[0]) * 0.5, (aCanvas[1] + bCanvas[1]) * 0.5 - 12, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "e2", (aCanvas[0] + cCanvas[0]) * 0.5, (aCanvas[1] + cCanvas[1]) * 0.5 - 12, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+      drawCanvasChip(ctx, "n", tipCanvas[0] + 10, tipCanvas[1] - 12, {
+        fontSize,
+        color: "rgba(239, 245, 247, 0.98)",
+      });
+    },
+  });
+}
+
+function setupNormalSmoothUseDemo() {
+  const canvas = document.getElementById("normal-smooth-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.02 : time * 0.8;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const fontSize = Math.max(10, width * 0.013);
+      const wobble = Math.sin(phase * 0.84) * 0.04;
+
+      function drawSurface(rect, smooth) {
+        drawLessonCanvasPanel(ctx, rect, smooth ? "Smooth" : "Flat", width);
+        const poly = [
+          [rect.x + rect.width * 0.18, rect.y + rect.height * 0.72],
+          [rect.x + rect.width * 0.44, rect.y + rect.height * (0.22 + wobble)],
+          [rect.x + rect.width * 0.82, rect.y + rect.height * 0.34],
+          [rect.x + rect.width * 0.66, rect.y + rect.height * 0.84],
+        ];
+
+        if (smooth) {
+          const gradient = ctx.createLinearGradient(poly[0][0], poly[0][1], poly[2][0], poly[1][1]);
+          gradient.addColorStop(0, "rgba(44, 86, 116, 0.92)");
+          gradient.addColorStop(0.55, "rgba(118, 209, 199, 0.95)");
+          gradient.addColorStop(1, "rgba(244, 186, 120, 0.94)");
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = "rgba(108, 153, 182, 0.82)";
+        }
+        ctx.strokeStyle = "rgba(239, 245, 247, 0.86)";
+        ctx.lineWidth = Math.max(1.8, width * 0.0028);
+        ctx.beginPath();
+        ctx.moveTo(poly[0][0], poly[0][1]);
+        for (let index = 1; index < poly.length; index += 1) {
+          ctx.lineTo(poly[index][0], poly[index][1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        if (smooth) {
+          const normals = [
+            { p: poly[0], n: normalize2([-0.36, 1]) },
+            { p: poly[1], n: normalize2([0.1, 1]) },
+            { p: poly[2], n: normalize2([0.44, 1]) },
+          ];
+          normals.forEach((entry) => {
+            drawArrow2d(ctx, entry.p, [entry.p[0] + entry.n[0] * rect.width * 0.12, entry.p[1] - entry.n[1] * rect.height * 0.16], "rgba(239, 245, 247, 0.9)", Math.max(1.6, width * 0.0024));
+          });
+          drawCanvasChip(ctx, "many n", rect.x + rect.width - 10, rect.y + 16, {
+            align: "right",
+            fontSize,
+            color: "rgba(115, 221, 213, 0.98)",
+          });
+        } else {
+          const center = [
+            (poly[0][0] + poly[1][0] + poly[2][0] + poly[3][0]) / 4,
+            (poly[0][1] + poly[1][1] + poly[2][1] + poly[3][1]) / 4,
+          ];
+          drawArrow2d(ctx, center, [center[0] + rect.width * 0.02, center[1] - rect.height * 0.22], "rgba(239, 245, 247, 0.9)", Math.max(1.8, width * 0.0026));
+          drawCanvasChip(ctx, "1 n", rect.x + rect.width - 10, rect.y + 16, {
+            align: "right",
+            fontSize,
+            color: "rgba(247, 160, 74, 0.98)",
+          });
+        }
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#183243");
+      drawSurface(leftRect, false);
+      drawSurface(rightRect, true);
+    },
+  });
+}
+
 function setupNormalsDemo() {
   const canvas = document.getElementById("normals-canvas");
   const gl = getGlContext(canvas);
@@ -5228,6 +5539,493 @@ function setupShaderDataflowDemo() {
   });
 }
 
+function setupShaderVertexUseDemo() {
+  const canvas = document.getElementById("shader-vertex-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.9 : time * 0.82;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+
+      function drawMesh(rect, moved) {
+        drawLessonCanvasPanel(ctx, rect, moved ? "Vertex moved" : "Original", width);
+        const cols = 11;
+        const rows = 5;
+        const inner = { x: rect.x + 14, y: rect.y + 36, width: rect.width - 28, height: rect.height - 50 };
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = 1;
+        for (let row = 0; row < rows; row += 1) {
+          ctx.beginPath();
+          for (let col = 0; col < cols; col += 1) {
+            const u = col / (cols - 1);
+            const v = row / (rows - 1);
+            const x = inner.x + u * inner.width;
+            const yBase = inner.y + inner.height * (0.18 + v * 0.62);
+            const wave = moved ? Math.sin(u * TAU * 1.4 + phase * 2.1) * inner.height * 0.12 : 0;
+            const y = yBase + wave;
+            if (col === 0) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.stroke();
+        }
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#173245");
+      drawMesh(leftRect, false);
+      drawMesh(rightRect, true);
+    },
+  });
+}
+
+function setupShaderFragmentUseDemo() {
+  const canvas = document.getElementById("shader-fragment-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.0 : time * 0.86;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const inner = { x: rect.x + 18, y: rect.y + 42, width: rect.width - 36, height: rect.height - 60 };
+      const stripeCount = 10;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#173245");
+      drawLessonCanvasPanel(ctx, rect, "Fragment pattern", width);
+
+      ctx.fillStyle = "rgba(12, 26, 36, 0.8)";
+      ctx.fillRect(inner.x, inner.y, inner.width, inner.height);
+      for (let index = 0; index < stripeCount; index += 1) {
+        const t = index / Math.max(stripeCount - 1, 1);
+        const x = inner.x + t * inner.width;
+        const wave = Math.sin(t * TAU * 3 + phase * 2.8) * 0.5 + 0.5;
+        ctx.fillStyle = rgbToCss([0.2 + wave * 0.55, 0.42 + wave * 0.28, 0.58 + (1 - wave) * 0.18]);
+        ctx.fillRect(x - inner.width / stripeCount * 0.35, inner.y, inner.width / stripeCount * 0.7, inner.height);
+      }
+      ctx.strokeStyle = "rgba(239, 245, 247, 0.26)";
+      ctx.lineWidth = Math.max(1.6, width * 0.0024);
+      ctx.strokeRect(inner.x, inner.y, inner.width, inner.height);
+    },
+  });
+}
+
+function setupShaderUniformUseDemo() {
+  const canvas = document.getElementById("shader-uniform-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.8 : time * 1.2;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const centers = [0.24, 0.5, 0.76].map((t) => rect.x + rect.width * t);
+      const pulse = 0.35 + (Math.sin(phase) * 0.5 + 0.5) * 0.65;
+      const color = rgbToCss([0.24 + pulse * 0.62, 0.48 + pulse * 0.24, 0.72 - pulse * 0.14]);
+      const fontSize = Math.max(10, width * 0.013);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#173245");
+      drawLessonCanvasPanel(ctx, rect, "Shared uniform", width);
+
+      centers.forEach((centerX) => {
+        const size = rect.height * (0.16 + pulse * 0.06);
+        ctx.fillStyle = color;
+        ctx.fillRect(centerX - size * 0.5, rect.y + rect.height * 0.46 - size * 0.5, size, size);
+        ctx.strokeStyle = "rgba(239, 245, 247, 0.24)";
+        ctx.lineWidth = Math.max(1.4, width * 0.0022);
+        ctx.strokeRect(centerX - size * 0.5, rect.y + rect.height * 0.46 - size * 0.5, size, size);
+      });
+      drawCanvasChip(ctx, "uTime", rect.x + rect.width - 12, rect.y + 16, {
+        align: "right",
+        fontSize,
+        color: "rgba(255, 223, 132, 0.98)",
+      });
+    },
+  });
+}
+
+function setupShaderVaryingUseDemo() {
+  const canvas = document.getElementById("shader-varying-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.0 : time * 0.72;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const triangle = [
+        [rect.x + rect.width * 0.14, rect.y + rect.height * 0.78],
+        [rect.x + rect.width * 0.48, rect.y + rect.height * 0.22],
+        [rect.x + rect.width * 0.84, rect.y + rect.height * (0.72 + Math.sin(phase) * 0.04)],
+      ];
+      const colors = [
+        [0.96, 0.42, 0.36],
+        [0.2, 0.84, 0.76],
+        [0.36, 0.58, 0.98],
+      ];
+      const sample = [
+        triangle[0][0] * 0.28 + triangle[1][0] * 0.36 + triangle[2][0] * 0.36,
+        triangle[0][1] * 0.28 + triangle[1][1] * 0.36 + triangle[2][1] * 0.36,
+      ];
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#0f2232", "#173245");
+      drawLessonCanvasPanel(ctx, rect, "Interpolated varying", width);
+
+      const step = Math.max(6, Math.floor(Math.min(rect.width, rect.height) * 0.045));
+      for (let y = rect.y + 36; y < rect.y + rect.height - 10; y += step) {
+        for (let x = rect.x + 10; x < rect.x + rect.width - 10; x += step) {
+          const point = [x + step * 0.5, y + step * 0.5];
+          const bary = barycentricCoordinates(point, triangle[0], triangle[1], triangle[2]);
+          if (!bary || bary.some((value) => value < 0)) {
+            continue;
+          }
+          const mixed = [0, 0, 0];
+          for (let index = 0; index < 3; index += 1) {
+            mixed[0] += colors[index][0] * bary[index];
+            mixed[1] += colors[index][1] * bary[index];
+            mixed[2] += colors[index][2] * bary[index];
+          }
+          ctx.fillStyle = rgbToCss(mixed);
+          ctx.fillRect(x, y, step + 1, step + 1);
+        }
+      }
+
+      ctx.strokeStyle = "rgba(239, 245, 247, 0.22)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0022);
+      ctx.beginPath();
+      ctx.moveTo(triangle[0][0], triangle[0][1]);
+      ctx.lineTo(triangle[1][0], triangle[1][1]);
+      ctx.lineTo(triangle[2][0], triangle[2][1]);
+      ctx.closePath();
+      ctx.stroke();
+
+      triangle.forEach((point, index) => {
+        drawCanvasDot(ctx, point, Math.max(6, width * 0.007), rgbToCss(colors[index]));
+      });
+      drawCanvasDot(ctx, sample, Math.max(6, width * 0.007), "rgba(255, 245, 216, 0.98)");
+    },
+  });
+}
+
+function setupCameraFovUseDemo() {
+  const canvas = document.getElementById("camera-fov-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.74 : time * 0.62;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const eye = [rect.x + rect.width * 0.2, rect.y + rect.height * 0.58];
+      const imageX = rect.x + rect.width * 0.48;
+      const farX = rect.x + rect.width * 0.9;
+      const narrow = degreesToRadians(36 + Math.sin(phase) * 6);
+      const wide = degreesToRadians(78 + Math.cos(phase * 0.8) * 6);
+      const fontSize = Math.max(10, width * 0.013);
+
+      function rayPoint(angle, x) {
+        const dx = x - eye[0];
+        return [x, eye[1] - Math.tan(angle) * dx];
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Lens angle", width);
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = Math.max(1.5, width * 0.0024);
+      ctx.beginPath();
+      ctx.moveTo(imageX, rect.y + 34);
+      ctx.lineTo(imageX, rect.y + rect.height - 14);
+      ctx.stroke();
+
+      drawCameraGlyph(ctx, eye, 0, Math.max(9, width * 0.011), "rgba(255, 245, 216, 0.92)");
+      drawArrow2d(ctx, eye, [farX, eye[1]], "rgba(255, 255, 255, 0.22)", Math.max(1.6, width * 0.0024));
+
+      const narrowTop = rayPoint(narrow * 0.5, farX);
+      const narrowBottom = rayPoint(-narrow * 0.5, farX);
+      const wideTop = rayPoint(wide * 0.5, farX);
+      const wideBottom = rayPoint(-wide * 0.5, farX);
+      drawArrow2d(ctx, eye, narrowTop, "rgba(247, 160, 74, 0.92)", Math.max(1.9, width * 0.0028));
+      drawArrow2d(ctx, eye, narrowBottom, "rgba(247, 160, 74, 0.92)", Math.max(1.9, width * 0.0028));
+      drawArrow2d(ctx, eye, wideTop, "rgba(115, 221, 213, 0.9)", Math.max(1.9, width * 0.0028));
+      drawArrow2d(ctx, eye, wideBottom, "rgba(115, 221, 213, 0.9)", Math.max(1.9, width * 0.0028));
+
+      drawCanvasChip(ctx, "narrow", farX - 24, narrowTop[1] + 14, {
+        fontSize,
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "wide", farX - 24, wideTop[1] - 14, {
+        fontSize,
+        color: "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupCameraPerspectiveUseDemo() {
+  const canvas = document.getElementById("camera-perspective-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.82 : time * 0.56;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const eye = [rect.x + rect.width * 0.16, rect.y + rect.height * 0.6];
+      const planeX = rect.x + rect.width * 0.48;
+      const screenX = rect.x + rect.width * 0.74;
+      const imageHeight = rect.height * 0.54;
+      const fov = degreesToRadians(54 + Math.sin(phase) * 6);
+      const objects = [
+        { depth: 1.3, x: rect.x + rect.width * 0.56, color: "rgba(247, 160, 74, 0.96)" },
+        { depth: 2.7, x: rect.x + rect.width * 0.84, color: "rgba(115, 221, 213, 0.96)" },
+      ];
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Perspective size", width);
+      drawCameraGlyph(ctx, eye, 0, Math.max(9, width * 0.011), "rgba(255, 245, 216, 0.92)");
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0022);
+      ctx.beginPath();
+      ctx.moveTo(planeX, rect.y + 34);
+      ctx.lineTo(planeX, rect.y + rect.height - 14);
+      ctx.moveTo(screenX, rect.y + 40);
+      ctx.lineTo(screenX, rect.y + rect.height - 18);
+      ctx.stroke();
+
+      objects.forEach((object, index) => {
+        const worldHeight = rect.height * 0.24;
+        const worldTop = eye[1] - worldHeight * 0.5;
+        const worldBottom = eye[1] + worldHeight * 0.5;
+        ctx.fillStyle = object.color;
+        ctx.fillRect(object.x - 8, worldTop, 16, worldHeight);
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.beginPath();
+        ctx.moveTo(eye[0], eye[1]);
+        ctx.lineTo(object.x, worldTop);
+        ctx.moveTo(eye[0], eye[1]);
+        ctx.lineTo(object.x, worldBottom);
+        ctx.stroke();
+
+        const projectedHeight = clamp((0.95 / object.depth) / Math.tan(fov * 0.5), 0.16, 0.92) * imageHeight;
+        ctx.fillRect(screenX - 10 + index * 24, eye[1] - projectedHeight * 0.5, 16, projectedHeight);
+      });
+    },
+  });
+}
+
+function setupCameraOrthoUseDemo() {
+  const canvas = document.getElementById("camera-ortho-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.8 : time * 0.54;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const leftEdge = rect.x + rect.width * 0.16;
+      const planeX = rect.x + rect.width * 0.48;
+      const screenX = rect.x + rect.width * 0.74;
+      const objectY = rect.y + rect.height * 0.6;
+      const objects = [
+        { x: rect.x + rect.width * 0.58, color: "rgba(247, 160, 74, 0.96)" },
+        { x: rect.x + rect.width * 0.84, color: "rgba(115, 221, 213, 0.96)" },
+      ];
+      const screenHeight = rect.height * 0.34;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Orthographic size", width);
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0022);
+      ctx.beginPath();
+      ctx.moveTo(planeX, rect.y + 34);
+      ctx.lineTo(planeX, rect.y + rect.height - 14);
+      ctx.moveTo(screenX, rect.y + 40);
+      ctx.lineTo(screenX, rect.y + rect.height - 18);
+      ctx.stroke();
+
+      objects.forEach((object, index) => {
+        const worldHeight = rect.height * 0.24;
+        ctx.fillStyle = object.color;
+        ctx.fillRect(object.x - 8, objectY - worldHeight * 0.5, 16, worldHeight);
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.beginPath();
+        ctx.moveTo(leftEdge, objectY - worldHeight * 0.5);
+        ctx.lineTo(planeX, objectY - worldHeight * 0.5);
+        ctx.moveTo(leftEdge, objectY + worldHeight * 0.5);
+        ctx.lineTo(planeX, objectY + worldHeight * 0.5);
+        ctx.stroke();
+
+        ctx.fillRect(screenX - 10 + index * 24, objectY - screenHeight * 0.5, 16, screenHeight);
+      });
+    },
+  });
+}
+
+function setupCameraNearUseDemo() {
+  const canvas = document.getElementById("camera-near-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  function encodeDepth(distance, near, far) {
+    return (1 / distance - 1 / near) / (1 / far - 1 / near);
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.72 : time * 0.74;
+      const margin = 18;
+      const gap = 14;
+      const panelWidth = (width - margin * 2 - gap) / 2;
+      const panelHeight = height - margin * 2;
+      const leftRect = { x: margin, y: margin, width: panelWidth, height: panelHeight };
+      const rightRect = { x: margin + panelWidth + gap, y: margin, width: panelWidth, height: panelHeight };
+      const far = 40;
+      const distances = [18.2 + Math.sin(phase) * 0.35, 18.72 + Math.cos(phase * 1.08) * 0.08];
+      const fontSize = Math.max(10, width * 0.013);
+
+      function drawPanel(rect, near, color) {
+        drawLessonCanvasPanel(ctx, rect, `near ${formatNumber(near, 1)}`, width);
+        const trackX = rect.x + 18;
+        const trackY = rect.y + rect.height * 0.5;
+        const trackWidth = rect.width - 36;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.fillRect(trackX, trackY, trackWidth, 10);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(trackX, trackY, trackWidth, 10);
+
+        distances.forEach((distance, index) => {
+          const encoded = encodeDepth(distance, near, far);
+          const x = trackX + trackWidth * clamp(encoded, 0, 1);
+          ctx.fillStyle = index === 0 ? color : "rgba(255, 245, 216, 0.92)";
+          ctx.beginPath();
+          ctx.arc(x, trackY + 5, index === 0 ? 7 : 5.5, 0, TAU);
+          ctx.fill();
+        });
+
+        drawCanvasChip(ctx, `${formatNumber(distances[0], 1)} / ${formatNumber(distances[1], 1)}`, rect.x + rect.width * 0.5, rect.y + rect.height - 18, {
+          fontSize,
+          color: "rgba(239, 245, 247, 0.92)",
+        });
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawPanel(leftRect, 0.1, "rgba(247, 160, 74, 0.96)");
+      drawPanel(rightRect, 1.0, "rgba(115, 221, 213, 0.96)");
+    },
+  });
+}
+
 function setupProjectionDemo() {
   const canvas = document.getElementById("projection-canvas");
   const gl = getGlContext(canvas);
@@ -5698,6 +6496,324 @@ function setupDepthPrecisionStoryDemo() {
       drawLessonCanvasBackground(ctx, width, height);
       drawPanel(panels[0]);
       drawPanel(panels[1]);
+    },
+  });
+}
+
+function setupRenderCoverageUseDemo() {
+  const canvas = document.getElementById("render-coverage-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.82 : time * 0.84;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const inner = { x: rect.x + 18, y: rect.y + 40, width: rect.width - 36, height: rect.height - 56 };
+      const columns = 8;
+      const rows = 5;
+      const triangle = [
+        [inner.x + inner.width * 0.14, inner.y + inner.height * 0.78],
+        [inner.x + inner.width * 0.48, inner.y + inner.height * (0.18 + Math.sin(phase) * 0.06)],
+        [inner.x + inner.width * 0.86, inner.y + inner.height * 0.68],
+      ];
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Coverage", width);
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.lineWidth = 1;
+      for (let col = 0; col <= columns; col += 1) {
+        const x = inner.x + (inner.width / columns) * col;
+        ctx.beginPath();
+        ctx.moveTo(x, inner.y);
+        ctx.lineTo(x, inner.y + inner.height);
+        ctx.stroke();
+      }
+      for (let row = 0; row <= rows; row += 1) {
+        const y = inner.y + (inner.height / rows) * row;
+        ctx.beginPath();
+        ctx.moveTo(inner.x, y);
+        ctx.lineTo(inner.x + inner.width, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(159, 215, 255, 0.18)";
+      ctx.strokeStyle = "rgba(159, 215, 255, 0.9)";
+      ctx.lineWidth = Math.max(1.6, width * 0.0024);
+      ctx.beginPath();
+      ctx.moveTo(triangle[0][0], triangle[0][1]);
+      ctx.lineTo(triangle[1][0], triangle[1][1]);
+      ctx.lineTo(triangle[2][0], triangle[2][1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < columns; col += 1) {
+          const cellX = inner.x + (inner.width / columns) * col;
+          const cellY = inner.y + (inner.height / rows) * row;
+          const sample = [cellX + inner.width / columns / 2, cellY + inner.height / rows / 2];
+          const bary = barycentricCoordinates(sample, triangle[0], triangle[1], triangle[2]);
+          const covered = bary && bary.every((value) => value >= 0);
+          if (covered) {
+            ctx.fillStyle = "rgba(115, 221, 213, 0.2)";
+            ctx.fillRect(cellX + 2, cellY + 2, inner.width / columns - 4, inner.height / rows - 4);
+          }
+          drawCanvasDot(ctx, sample, covered ? 2.6 : 2.2, covered ? "rgba(255, 245, 216, 0.96)" : "rgba(255, 255, 255, 0.3)");
+        }
+      }
+    },
+  });
+}
+
+function setupRenderBarycentricUseDemo() {
+  const canvas = document.getElementById("render-barycentric-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.0 : time * 0.76;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const triangle = [
+        [rect.x + rect.width * 0.16, rect.y + rect.height * 0.8],
+        [rect.x + rect.width * 0.46, rect.y + rect.height * 0.22],
+        [rect.x + rect.width * 0.82, rect.y + rect.height * (0.72 + Math.sin(phase) * 0.04)],
+      ];
+      let weights = [
+        0.26 + Math.sin(phase * 0.8) * 0.1,
+        0.38 + Math.cos(phase * 1.02) * 0.08,
+        0.36 + Math.sin(phase * 1.3 + 0.8) * 0.08,
+      ];
+      const total = weights[0] + weights[1] + weights[2];
+      weights = weights.map((value) => value / total);
+      const sample = [
+        triangle[0][0] * weights[0] + triangle[1][0] * weights[1] + triangle[2][0] * weights[2],
+        triangle[0][1] * weights[0] + triangle[1][1] * weights[1] + triangle[2][1] * weights[2],
+      ];
+      const colors = [
+        [0.96, 0.42, 0.36],
+        [0.2, 0.84, 0.76],
+        [0.36, 0.58, 0.98],
+      ];
+      const mixed = [0, 0, 0];
+      for (let index = 0; index < 3; index += 1) {
+        mixed[0] += colors[index][0] * weights[index];
+        mixed[1] += colors[index][1] * weights[index];
+        mixed[2] += colors[index][2] * weights[index];
+      }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Interpolation", width);
+
+      ctx.strokeStyle = "rgba(239, 245, 247, 0.22)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0022);
+      ctx.beginPath();
+      ctx.moveTo(triangle[0][0], triangle[0][1]);
+      ctx.lineTo(triangle[1][0], triangle[1][1]);
+      ctx.lineTo(triangle[2][0], triangle[2][1]);
+      ctx.closePath();
+      ctx.stroke();
+      triangle.forEach((point, index) => {
+        drawCanvasDot(ctx, point, Math.max(6, width * 0.007), rgbToCss(colors[index]));
+      });
+      drawCanvasDot(ctx, sample, Math.max(6, width * 0.007), rgbToCss(mixed), "rgba(255, 245, 216, 0.94)", Math.max(1.5, width * 0.0022));
+
+      const swatch = { x: rect.x + rect.width * 0.62, y: rect.y + rect.height * 0.2, size: rect.width * 0.16 };
+      ctx.fillStyle = rgbToCss(mixed);
+      ctx.fillRect(swatch.x, swatch.y, swatch.size, swatch.size);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.strokeRect(swatch.x, swatch.y, swatch.size, swatch.size);
+    },
+  });
+}
+
+function setupRenderDepthUseDemo() {
+  const canvas = document.getElementById("render-depth-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 1.08 : time * 0.78;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const frontDepth = 0.26 + (Math.sin(phase * 1.04) + 1) * 0.05;
+      const backDepth = 0.62 + (Math.cos(phase * 0.82) + 1) * 0.04;
+      const winnerFront = frontDepth < backDepth;
+      const inner = { x: rect.x + 16, y: rect.y + 38, width: rect.width * 0.54, height: rect.height - 54 };
+      const barX = rect.x + rect.width * 0.68;
+      const barY = rect.y + rect.height * 0.46;
+      const barWidth = rect.width * 0.22;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Depth winner", width);
+
+      ctx.fillStyle = "rgba(115, 221, 213, 0.28)";
+      ctx.fillRect(inner.x + inner.width * 0.16, inner.y + inner.height * 0.12, inner.width * 0.56, inner.height * 0.58);
+      ctx.fillStyle = "rgba(247, 160, 74, 0.34)";
+      ctx.fillRect(inner.x + inner.width * 0.34, inner.y + inner.height * 0.24, inner.width * 0.5, inner.height * 0.56);
+      ctx.strokeStyle = "rgba(239, 245, 247, 0.18)";
+      ctx.lineWidth = Math.max(1.4, width * 0.0022);
+      ctx.strokeRect(inner.x + inner.width * 0.16, inner.y + inner.height * 0.12, inner.width * 0.56, inner.height * 0.58);
+      ctx.strokeRect(inner.x + inner.width * 0.34, inner.y + inner.height * 0.24, inner.width * 0.5, inner.height * 0.56);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(barX, barY, barWidth, 10);
+      const frontX = barX + barWidth * frontDepth;
+      const backX = barX + barWidth * backDepth;
+      drawCanvasDot(ctx, [backX, barY + 5], 5.5, "rgba(115, 221, 213, 0.9)");
+      drawCanvasDot(ctx, [frontX, barY + 5], 7, "rgba(247, 160, 74, 0.96)");
+      drawCanvasChip(ctx, winnerFront ? "orange wins" : "teal wins", rect.x + rect.width - 12, rect.y + 16, {
+        align: "right",
+        fontSize: Math.max(10, width * 0.013),
+        color: winnerFront ? "rgba(247, 160, 74, 0.98)" : "rgba(115, 221, 213, 0.98)",
+      });
+    },
+  });
+}
+
+function setupRenderSamplingUseDemo() {
+  const canvas = document.getElementById("render-sampling-use-canvas");
+  const ctx = get2dContext(canvas);
+  if (!ctx) {
+    return;
+  }
+
+  const size = 4;
+
+  function texelColor(x, y) {
+    return [0.18 + (x / (size - 1)) * 0.68, 0.24 + (y / (size - 1)) * 0.56, 0.74 - ((x + y) / (size * 2)) * 0.34];
+  }
+
+  function sampleNearest(u, v) {
+    const x = Math.min(size - 1, Math.max(0, Math.round(u * (size - 1))));
+    const y = Math.min(size - 1, Math.max(0, Math.round(v * (size - 1))));
+    return texelColor(x, y);
+  }
+
+  function sampleLinear(u, v) {
+    const x = clamp(u * (size - 1), 0, size - 1);
+    const y = clamp(v * (size - 1), 0, size - 1);
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const x1 = Math.min(size - 1, x0 + 1);
+    const y1 = Math.min(size - 1, y0 + 1);
+    const tx = x - x0;
+    const ty = y - y0;
+    const c00 = texelColor(x0, y0);
+    const c10 = texelColor(x1, y0);
+    const c01 = texelColor(x0, y1);
+    const c11 = texelColor(x1, y1);
+    const top = [lerp(c00[0], c10[0], tx), lerp(c00[1], c10[1], tx), lerp(c00[2], c10[2], tx)];
+    const bottom = [lerp(c01[0], c11[0], tx), lerp(c01[1], c11[1], tx), lerp(c01[2], c11[2], tx)];
+    return [lerp(top[0], bottom[0], ty), lerp(top[1], bottom[1], ty), lerp(top[2], bottom[2], ty)];
+  }
+
+  registerDemo({
+    canvas,
+    visible: true,
+    needsRender: true,
+    render(time) {
+      resizeCanvasToDisplaySize(canvas);
+      const width = canvas.width;
+      const height = canvas.height;
+      const phase = prefersReducedMotion ? 0.76 : time * 0.64;
+      const rect = { x: 18, y: 18, width: width - 36, height: height - 36 };
+      const texRect = { x: rect.x + 16, y: rect.y + 40, width: rect.width * 0.5, height: rect.height - 56 };
+      const u = wrapUnit(0.22 + phase * 0.18);
+      const v = 0.28 + (Math.sin(phase * 1.08) * 0.5 + 0.5) * 0.48;
+      const nearest = sampleNearest(u, v);
+      const linear = sampleLinear(u, v);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawLessonCanvasBackground(ctx, width, height, "#102535", "#183446");
+      drawLessonCanvasPanel(ctx, rect, "Texture sample", width);
+
+      const cellW = texRect.width / size;
+      const cellH = texRect.height / size;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          ctx.fillStyle = rgbToCss(texelColor(x, y));
+          ctx.fillRect(texRect.x + x * cellW, texRect.y + y * cellH, cellW, cellH);
+        }
+      }
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= size; x += 1) {
+        const drawX = texRect.x + x * cellW;
+        ctx.beginPath();
+        ctx.moveTo(drawX, texRect.y);
+        ctx.lineTo(drawX, texRect.y + texRect.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= size; y += 1) {
+        const drawY = texRect.y + y * cellH;
+        ctx.beginPath();
+        ctx.moveTo(texRect.x, drawY);
+        ctx.lineTo(texRect.x + texRect.width, drawY);
+        ctx.stroke();
+      }
+
+      const samplePoint = [texRect.x + u * texRect.width, texRect.y + v * texRect.height];
+      drawCanvasDot(ctx, samplePoint, 5.5, "rgba(255, 245, 216, 0.96)");
+      const swatchX = rect.x + rect.width * 0.66;
+      const swatchY = rect.y + 56;
+      const swatchSize = rect.width * 0.14;
+      ctx.fillStyle = rgbToCss(nearest);
+      ctx.fillRect(swatchX, swatchY, swatchSize, swatchSize);
+      ctx.fillStyle = rgbToCss(linear);
+      ctx.fillRect(swatchX + swatchSize + 18, swatchY, swatchSize, swatchSize);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.strokeRect(swatchX, swatchY, swatchSize, swatchSize);
+      ctx.strokeRect(swatchX + swatchSize + 18, swatchY, swatchSize, swatchSize);
+      drawCanvasChip(ctx, "N", swatchX + swatchSize * 0.5, swatchY + swatchSize + 18, {
+        fontSize: Math.max(10, width * 0.013),
+        color: "rgba(247, 160, 74, 0.98)",
+      });
+      drawCanvasChip(ctx, "L", swatchX + swatchSize + 18 + swatchSize * 0.5, swatchY + swatchSize + 18, {
+        fontSize: Math.max(10, width * 0.013),
+        color: "rgba(115, 221, 213, 0.98)",
+      });
     },
   });
 }
@@ -14041,10 +15157,18 @@ function initialize() {
   safeSetup("space-map-canvas", setupSpaceMapStoryDemo);
   safeSetup("clip-story-canvas", setupClipStoryDemo);
   safeSetup("game-normals-canvas", setupGameNormalsStoryDemo);
+  safeSetup("normal-dot-use-canvas", setupNormalDotUseDemo);
+  safeSetup("normal-facing-use-canvas", setupNormalFacingUseDemo);
+  safeSetup("normal-cross-use-canvas", setupNormalCrossUseDemo);
+  safeSetup("normal-smooth-use-canvas", setupNormalSmoothUseDemo);
   safeSetup("normals-canvas", setupNormalsDemo);
   safeSetup("shader-canvas", setupShaderDemo);
   safeSetup("shader-fluid-canvas", setupShaderFluidDemo);
   safeSetup("shader-dataflow-canvas", setupShaderDataflowDemo);
+  safeSetup("shader-vertex-use-canvas", setupShaderVertexUseDemo);
+  safeSetup("shader-fragment-use-canvas", setupShaderFragmentUseDemo);
+  safeSetup("shader-uniform-use-canvas", setupShaderUniformUseDemo);
+  safeSetup("shader-varying-use-canvas", setupShaderVaryingUseDemo);
   safeSetup("normal-code-canvas", setupNormalCodeLab);
   safeSetup("shader-code-canvas", setupShaderCodeLab);
   safeSetup("basis-probe-canvas", setupBasisProbeDemo);
@@ -14060,6 +15184,14 @@ function initialize() {
   safeSetup("projection-canvas", setupProjectionDemo);
   safeSetup("camera-compare-canvas", setupCameraCompareStoryDemo);
   safeSetup("depth-precision-canvas", setupDepthPrecisionStoryDemo);
+  safeSetup("render-coverage-use-canvas", setupRenderCoverageUseDemo);
+  safeSetup("render-barycentric-use-canvas", setupRenderBarycentricUseDemo);
+  safeSetup("render-depth-use-canvas", setupRenderDepthUseDemo);
+  safeSetup("render-sampling-use-canvas", setupRenderSamplingUseDemo);
+  safeSetup("camera-fov-use-canvas", setupCameraFovUseDemo);
+  safeSetup("camera-perspective-use-canvas", setupCameraPerspectiveUseDemo);
+  safeSetup("camera-ortho-use-canvas", setupCameraOrthoUseDemo);
+  safeSetup("camera-near-use-canvas", setupCameraNearUseDemo);
   safeSetup("projection-code-canvas", setupProjectionCodeLab);
   safeSetup("texture-code-canvas", setupTextureCodeLab);
   safeSetup("sampling-story-canvas", setupSamplingStoryDemo);

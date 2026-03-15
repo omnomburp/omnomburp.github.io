@@ -47,6 +47,7 @@
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
+            <a href="#camera-uses">More uses</a>
             <a href="#camera-compare">Camera shapes</a>
             <a href="#projection-chain">Step by step</a>
             <a href="#depth-precision">Depth precision</a>
@@ -129,6 +130,55 @@
               <span class="step-number">4</span>
               <h3>Field of view changes framing, not object size in world space</h3>
               <p>A wider field of view shows more of the scene, but it also exaggerates perspective near the camera.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="camera-uses">
+          <div class="section-header">
+            <p class="eyebrow">Reinforcement</p>
+            <h2>Revisit the camera as several separate controls and consequences</h2>
+            <p>
+              Camera chapters get confusing when “zoom,” “lens,” “distance,” and “projection” blur together. These
+              small examples keep those controls visually separate so the later camera code reads more cleanly.
+            </p>
+          </div>
+
+          <div class="reinforcement-grid">
+            <article class="mini-canvas-card">
+              <h3>Field of view changes the lens opening</h3>
+              <div class="canvas-card">
+                <canvas id="camera-fov-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Field of view frustum example"></canvas>
+              </div>
+              <p>A wider angle shows more scene and exaggerates perspective. A narrower angle feels more zoomed and compressed.</p>
+              <p class="card-code"><code>perspective(fov, aspect, near, far)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Perspective makes equal objects look unequal with depth</h3>
+              <div class="canvas-card">
+                <canvas id="camera-perspective-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Perspective depth scaling example"></canvas>
+              </div>
+              <p>Two identical objects can project to very different screen heights if one is farther from the camera.</p>
+              <p class="card-code"><code>screen ~ world / z</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Orthographic keeps sizes stable across depth</h3>
+              <div class="canvas-card">
+                <canvas id="camera-ortho-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Orthographic size consistency example"></canvas>
+              </div>
+              <p>The objects still have depth order, but their projected size no longer shrinks with distance.</p>
+              <p class="card-code"><code>ortho(left, right, bottom, top)</code></p>
+            </article>
+
+            <article class="mini-canvas-card">
+              <h3>Near-plane choices change depth precision</h3>
+              <div class="canvas-card">
+                <canvas id="camera-near-use-canvas" class="canvas-stage canvas-stage-compact" aria-label="Near plane and depth precision example"></canvas>
+              </div>
+              <p>The clip range is not just a visibility choice. It also changes how depth values get distributed across the scene.</p>
+              <p class="card-code"><code>near too small -&gt; z-fighting risk</code></p>
             </article>
           </div>
         </section>

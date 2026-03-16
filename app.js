@@ -2134,7 +2134,7 @@ function setupReveals() {
         currentObserver.unobserve(entry.target);
       }
     },
-    { threshold: 0.16 }
+    { threshold: 0, rootMargin: '0px 0px 200px 0px' }
   );
 
   revealBlocks.forEach((element) => {

@@ -2061,24 +2061,25 @@ input[type="checkbox"]:focus-visible {
   }
 
   .canvas-stage {
-    min-height: 260px;
+    height: auto;
+    min-height: 56vw;
   }
 
   .canvas-stage-compact {
-    min-height: 210px;
+    min-height: 48vw;
   }
 
   .canvas-stage-wide {
-    height: clamp(340px, 76vw, 500px);
-    min-height: 340px;
+    height: auto;
+    min-height: 48vw;
   }
 
   .story-canvas-card .canvas-stage-compact {
-    min-height: 260px;
+    min-height: 56vw;
   }
 
   .story-canvas-card-wide .canvas-stage-compact {
-    min-height: 280px;
+    min-height: 60vw;
   }
 
   .canvas-overlay {
@@ -2129,12 +2130,21 @@ input[type="checkbox"]:focus-visible {
     padding: 1rem 0.9rem;
   }
 
+  .canvas-card-hero {
+    height: 52vw;
+    min-height: 180px;
+  }
+
   .canvas-stage {
-    min-height: 220px;
+    min-height: 48vw;
   }
 
   .canvas-stage-compact {
-    min-height: 170px;
+    min-height: 40vw;
+  }
+
+  .canvas-stage-wide {
+    min-height: 44vw;
   }
 
   .control {

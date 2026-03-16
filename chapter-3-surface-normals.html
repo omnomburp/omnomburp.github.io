@@ -55,6 +55,7 @@
             <a href="#code-lab">Guided code lab</a>
             <a href="#normal-maps">Normal maps</a>
             <a href="#tangent-space">Tangent space</a>
+            <a href="#tbn-animation">TBN animation</a>
             <a href="#tbn-lab">TBN lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
@@ -654,6 +655,22 @@ float diffuse = max(dot(n, lightDir), 0.0);</code></pre>
               </article>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="tbn-animation">
+          <div class="section-header">
+            <p class="eyebrow">Visual explainer</p>
+            <h2>The TBN frame rotates with the surface, keeping normal mapping coherent</h2>
+            <p>
+              The tangent (T), bitangent (B), and normal (N) vectors form a local coordinate frame
+              attached to the surface. As the surface tilts, the entire frame rotates together so that
+              a normal-map perturbation defined in tangent space always transforms correctly into world space.
+            </p>
+          </div>
+          <article class="canvas-card">
+            <canvas id="tbn-animation-canvas" class="canvas-stage" aria-label="TBN frame animation showing vectors rotating with surface tilt"></canvas>
+            <p class="canvas-caption">T (red), B (green), and N (blue) rotate together as the surface tilts. The purple arrow shows a normal-map perturbation that stays correct in world space.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="tbn-lab">

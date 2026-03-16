@@ -46,9 +46,15 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#game-intuition">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#fresnel-effect">Fresnel effect</a>
+            <a href="#roughness-lobe">Specular lobe</a>
             <a href="#material-story">Material story</a>
+            <a href="#metal-vs-dielectric">Metal vs dielectric</a>
+            <a href="#energy-conservation">Energy conservation</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -76,7 +82,7 @@
             </article>
             <article class="mini-card">
               <h2>Roughness</h2>
-              <p>Widens and softens the specular response instead of acting like a vague “shininess” number.</p>
+              <p>Widens and softens the specular response instead of acting like a vague "shininess" number.</p>
             </article>
             <article class="mini-card">
               <h2>Environment light</h2>
@@ -86,16 +92,47 @@
 
           <div class="formula-strip">
             <article class="formula-card">
-              <span class="formula-label">Metallic-roughness shortcut</span>
+              <span class="formula-label">Schlick Fresnel</span>
+              <code>F = F0 + (1 - F0)(1 - cosTheta)^5</code>
+            </article>
+            <article class="formula-card">
+              <span class="formula-label">Metallic F0</span>
               <code>F0 = mix(vec3(0.04), baseColor, metalness)</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Roughness idea</span>
-              <code>higher roughness = wider lobe</code>
+              <span class="formula-label">Energy rule</span>
+              <code>diffuse + specular &lt;= 1</code>
             </article>
-            <article class="formula-card">
-              <span class="formula-label">Environment idea</span>
-              <code>reflection samples the world, not empty space</code>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-intuition">
+          <div class="section-header">
+            <p class="eyebrow">Game intuition</p>
+            <h2>Why PBR became the default for real-time materials</h2>
+            <p>
+              Before PBR, artists tuned separate diffuse color, specular color, shininess, and ambient values per material per scene.
+              Moving an asset to a different lighting setup often meant re-tweaking everything. PBR constrains the material response
+              to physical rules, which means a material authored once looks plausible under many different lighting conditions.
+            </p>
+          </div>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h3>Weapons and armor</h3>
+              <p>Metal armor reflects the environment and tints reflections with its base color. Leather straps stay diffuse. One material model handles both on the same character.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Wet and dry surfaces</h3>
+              <p>Rain on a cobblestone road lowers roughness and raises F0 at the surface. PBR makes this a parameter change, not a separate shader.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Environment transitions</h3>
+              <p>A character walks from a dark cave into sunlight. PBR materials respond naturally because the environment cubemap changes, not the material knobs.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Asset reuse across scenes</h3>
+              <p>A prop authored for one level can be placed in another without re-tweaking. The material describes physical properties, not scene-specific hacks.</p>
             </article>
           </div>
         </section>
@@ -130,6 +167,43 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="fresnel-effect">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>The Fresnel effect makes edges more reflective than head-on views</h2>
+            <p>
+              When you look at a lake, the water near the horizon acts like a mirror while the water at your feet shows the bottom.
+              This is the Fresnel effect: reflectance increases at grazing angles. Schlick's approximation models it cheaply:
+              <code>F = F0 + (1 - F0) * (1 - cos&theta;)^5</code>, where F0 is the reflectance at normal incidence and &theta;
+              is the angle between the view direction and the surface normal. For dielectrics, F0 is small (around 0.04). For metals,
+              F0 is the base color itself. The exponent of 5 produces a rapid ramp near grazing angles.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="fresnel-canvas" class="canvas-stage" aria-label="Sphere showing Fresnel reflectance increasing from center to edge with Schlick formula overlay"></canvas>
+            <p class="canvas-caption">The sphere shows reflectance increasing from center (normal incidence, low F) to rim (grazing angle, high F). The curve on the right plots Schlick's approximation for the current F0.</p>
+          </article>
+        </section>
+
+        <section class="panel reveal-block" id="roughness-lobe">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>The specular lobe is the angular distribution of reflected energy</h2>
+            <p>
+              A perfectly smooth mirror reflects all incoming light in exactly one direction. A rough surface scatters that light into a cone.
+              The <strong>specular lobe</strong> describes the shape of that cone: how wide or narrow the reflected energy spreads around the
+              perfect mirror direction. Low roughness produces a tight, bright lobe (sharp highlight). High roughness produces a wide, dim lobe
+              (soft, spread-out highlight). The total energy in the lobe stays roughly the same; it just gets redistributed over a larger area.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="roughness-lobe-canvas" class="canvas-stage" aria-label="Animated specular lobe shape changing from tight cone to wide spread as roughness increases"></canvas>
+            <p class="canvas-caption">The lobe shape changes with roughness. Low roughness concentrates reflected energy into a tight cone; high roughness spreads it wide. The total reflected energy is roughly constant.</p>
+          </article>
+        </section>
+
         <section class="panel reveal-block" id="material-story">
           <div class="section-header">
             <p class="eyebrow">Material story</p>
@@ -144,7 +218,7 @@
               </li>
               <li>
                 <h3>Let Fresnel increase reflection toward grazing angles</h3>
-                <p>Even simple models benefit when edges feel more reflective than head-on views.</p>
+                <p>Even simple models benefit when edges feel more reflective than head-on views. Schlick's approximation: <code>F = F0 + (1 - F0)(1 - cos&theta;)^5</code>.</p>
               </li>
               <li>
                 <h3>Use roughness to reshape the highlight and reflection</h3>
@@ -152,7 +226,7 @@
               </li>
               <li>
                 <h3>Light the object with a world, not just a lamp</h3>
-                <p>Image-based lighting gives the material something believable to reflect and picks up broad ambient cues from the scene.</p>
+                <p>Image-based lighting gives the material something believable to reflect and picks up broad ambient cues from the scene. A cubemap stores the environment as six face textures; a direction vector maps to a face and UV coordinate.</p>
               </li>
             </ol>
 
@@ -166,8 +240,8 @@
                 <p>A surface has bright specular response and strong diffuse color at the same time in a way that feels energy-incoherent.</p>
               </article>
               <article class="mini-card">
-                <h3>IBL intuition</h3>
-                <p>The environment is just another light source, but one that comes from many directions and carries scene color with it.</p>
+                <h3>IBL and cubemaps</h3>
+                <p>A cubemap is a six-face box texture. The renderer converts a reflection direction into a face index and UV coordinate to sample the environment. Pre-filtered mip levels store blurred versions for rougher surfaces.</p>
               </article>
               <article class="mini-card">
                 <h3>Good debugging move</h3>
@@ -175,6 +249,43 @@
               </article>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="metal-vs-dielectric">
+          <div class="section-header">
+            <p class="eyebrow">Concept isolation</p>
+            <h2>Metals and dielectrics split the same base color into different channels</h2>
+            <p>
+              A dielectric (plastic, wood, stone) has a small neutral F0 around 0.04 and puts most of its base color into diffuse response.
+              A metal has no diffuse response; instead, its base color becomes the F0, tinting reflections with the material color.
+              The metalness slider interpolates between these two behaviors. This is why a gold sphere reflects gold-tinted highlights
+              while a yellow plastic sphere has white highlights.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="metal-vs-dielectric-canvas" class="canvas-stage" aria-label="Side-by-side spheres showing metal vs dielectric reflection behavior"></canvas>
+            <p class="canvas-caption">Left: dielectric sphere with white specular highlights and colored diffuse. Right: metal sphere with tinted specular reflections and no diffuse. Same base color, different material class.</p>
+          </article>
+        </section>
+
+        <section class="panel reveal-block" id="energy-conservation">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>Energy conservation keeps materials from emitting more light than they receive</h2>
+            <p>
+              A physically plausible surface must not reflect more energy than arrives. If a large fraction goes into specular reflection,
+              less is available for diffuse. PBR enforces this as a constraint: <code>diffuse + specular &lt;= 1.0</code> at every point.
+              Without energy conservation, a surface can look unnaturally bright or glowing, especially at grazing angles where Fresnel
+              boosts specular contribution. The bar chart below shows how the diffuse and specular fractions change with metalness and
+              roughness, always staying within the energy budget.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="energy-conservation-canvas" class="canvas-stage" aria-label="Bar chart showing diffuse plus specular fractions clamped to not exceed 1.0"></canvas>
+            <p class="canvas-caption">The diffuse and specular bars always sum to at most 1.0. As metalness increases, diffuse shrinks to zero and specular takes over. As Fresnel ramps at the edge, specular grows while diffuse is reduced accordingly.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="lab">
@@ -239,6 +350,66 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Walk through the PBR shading equation one term at a time</h2>
+            <p>
+              This lab isolates each contribution to the final pixel color: diffuse, specular, Fresnel, and environment.
+              Toggle individual terms on and off to see how they combine, and adjust roughness to watch the specular
+              term reshape itself.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                Each toggle controls one term of the PBR equation. Start with only diffuse enabled, then add specular,
+                then Fresnel, then environment. Watch how the sphere changes as each physical contribution is layered in.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Roughness</span>
+                  <input id="pbr-code-roughness" type="range" min="4" max="100" value="38" />
+                </label>
+                <label class="control">
+                  <span>Metalness</span>
+                  <input id="pbr-code-metalness" type="range" min="0" max="100" value="50" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show diffuse</span>
+                  <input id="pbr-code-diffuse" type="checkbox" checked />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show specular</span>
+                  <input id="pbr-code-specular" type="checkbox" checked />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show Fresnel</span>
+                  <input id="pbr-code-fresnel" type="checkbox" checked />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show environment</span>
+                  <input id="pbr-code-env" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Disable everything except diffuse. The sphere looks flat and matte.</li>
+                <li>Add specular. A highlight appears, shaped by roughness.</li>
+                <li>Add Fresnel. The edges become more reflective than the center.</li>
+                <li>Add environment. The sphere picks up color from the surrounding world.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="pbr-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="PBR term isolation demo showing diffuse, specular, Fresnel, and environment contributions"></canvas>
+              <p class="canvas-caption">Toggle each PBR term to see its isolated contribution to the final material appearance.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -253,6 +424,10 @@
             <article class="checkpoint-card">
               <h3>Common mistake</h3>
               <p>Treating PBR as a preset look instead of a disciplined split between diffuse response, specular response, and environment contribution.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Fresnel effect, Schlick's approximation, specular lobe, F0, energy conservation, cubemap, metalness, roughness, image-based lighting.</p>
             </article>
             <article class="checkpoint-card">
               <h3>Carry forward</h3>

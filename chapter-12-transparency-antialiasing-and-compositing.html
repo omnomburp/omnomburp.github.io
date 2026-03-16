@@ -40,15 +40,21 @@
         <section class="aside-card">
           <p class="eyebrow">Chapter 12</p>
           <p class="sidebar-title">Transparency, antialiasing, and compositing</p>
-          <p>This chapter moves from “one winning fragment” toward the messier cases where several layers, partial coverage, and background color all matter.</p>
+          <p>This chapter moves from "one winning fragment" toward the messier cases where several layers, partial coverage, and background color all matter.</p>
         </section>
 
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#game-intuition">Game intuition</a>
+            <a href="#blend-order">Blend order</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#coverage-vs-opacity">Coverage vs opacity</a>
             <a href="#order-rules">Order rules</a>
+            <a href="#premultiplied-alpha">Premultiplied alpha</a>
+            <a href="#msaa-coverage">MSAA coverage</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -90,14 +96,60 @@
               <code>out_rgb = src_rgb * a + dst_rgb * (1 - a)</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Coverage question</span>
-              <code>edge != fully covered pixel</code>
+              <span class="formula-label">Premultiplied alpha</span>
+              <code>premul_rgb = rgb * a</code>
             </article>
             <article class="formula-card">
               <span class="formula-label">Sorting rule</span>
               <code>draw far layers before near layers</code>
             </article>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-intuition">
+          <div class="section-header">
+            <p class="eyebrow">Game intuition</p>
+            <h2>Where transparency shows up in real-time scenes</h2>
+            <p>
+              Transparency is not just stained glass. Nearly every shipped game and real-time application has to deal with layered, partially
+              see-through surfaces. The same compositing decisions drive particle systems, UI overlays, foliage cards, and hair rendering.
+            </p>
+          </div>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h3>Particle effects</h3>
+              <p>Smoke, fire, and spell effects layer many semi-transparent quads. Wrong draw order makes the stack look inverted or causes bright halos around dark particles.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Foliage and hair</h3>
+              <p>Tree leaves and hair strands use alpha-tested or alpha-blended cutouts. Sorting thousands of tiny blended cards per frame is a real production cost.</p>
+            </article>
+            <article class="mini-card">
+              <h3>UI and HUD layers</h3>
+              <p>Health bars, minimaps, and dialog boxes blend over the 3D scene. Getting the alpha math wrong produces dark outlines or washed-out text on varied backgrounds.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Water and glass</h3>
+              <p>Refractive and transmissive surfaces need to composite the background they reveal. A glass panel with wrong ordering looks opaque from certain angles.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="blend-order">
+          <div class="section-header">
+            <p class="eyebrow">Visual explainer</p>
+            <h2>The same layers produce different colors when drawn in a different order</h2>
+            <p>
+              Two overlapping colored rectangles are composited below. Toggle the draw order and watch the resulting pixel color and formula
+              update. This is the core problem: alpha blending is order-dependent because each layer modifies what the layers behind it contribute.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="blend-order-canvas" class="canvas-stage" aria-label="Blend order comparison showing two overlapping colored rectangles with togglable draw order"></canvas>
+            <p class="canvas-caption">Click the toggle to swap draw order. The overlap region changes color because the back layer's contribution depends on which layer was drawn first.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="mental-model">
@@ -128,6 +180,23 @@
               <p>An otherwise sharp renderer can still look cheap if transparency halos, jagged silhouettes, or sorting errors remain unresolved.</p>
             </article>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="coverage-vs-opacity">
+          <div class="section-header">
+            <p class="eyebrow">Concept isolation</p>
+            <h2>Coverage and opacity are related ideas that solve different problems</h2>
+            <p>
+              Coverage asks: how much of this pixel does the triangle actually occupy? Opacity asks: even where the triangle fully covers the pixel,
+              how much light does it let through? A triangle edge at the boundary of a pixel has partial coverage. A glass pane in the center of a
+              pixel has full coverage but partial opacity. Antialiasing addresses the first; alpha blending addresses the second.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="coverage-vs-opacity-canvas" class="canvas-stage" aria-label="Side-by-side comparison of geometric coverage vs material opacity"></canvas>
+            <p class="canvas-caption">Left: a triangle edge partially covers a pixel grid (geometric coverage). Right: a fully covering surface with adjustable material transparency (opacity). Both affect the final pixel color, but they come from different sources.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="order-rules">
@@ -172,6 +241,100 @@
               <article class="mini-card">
                 <h3>Good debugging move</h3>
                 <p>Freeze the camera, disable one translucent layer at a time, and inspect whether the blend order matches the scene depth you expect.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="premultiplied-alpha">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>Premultiplied alpha stores the multiplication up front so compositing gets simpler</h2>
+            <p>
+              In straight alpha, a pixel stores its full RGB color and a separate alpha channel. The blend formula multiplies <code>rgb * a</code>
+              every time it composites. In premultiplied alpha, the source color is already <code>premul_rgb = rgb * a</code> before it reaches
+              the compositor. This changes the blend formula from <code>out = src * a + dst * (1 - a)</code> to the simpler
+              <code>out = src + dst * (1 - a)</code>. Premultiplied alpha composes more cleanly when layering many passes, avoids dark fringe
+              artifacts on partially transparent edges, and is the internal format most GPU compositors expect.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="premultiplied-canvas" class="canvas-stage" aria-label="Straight vs premultiplied alpha comparison with formula overlay"></canvas>
+            <p class="canvas-caption">Left: straight alpha compositing. Right: premultiplied alpha compositing. Watch for dark fringe differences at the semi-transparent edges.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Straight alpha: color and coverage are separate</h3>
+                <p>RGB stores the full color. Alpha is multiplied in at blend time: <code>out = src_rgb * src_a + dst_rgb * (1 - src_a)</code>.</p>
+              </li>
+              <li>
+                <h3>Premultiplied alpha: color already includes coverage</h3>
+                <p>RGB is pre-scaled by alpha. Blending simplifies to <code>out = src_premul + dst * (1 - src_a)</code>. No extra multiply needed.</p>
+              </li>
+              <li>
+                <h3>Premultiplied avoids edge fringing</h3>
+                <p>When filtering or mipmapping semi-transparent textures, straight alpha can produce dark borders because RGB values near transparent pixels were never meant to be seen at full strength.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>GPU default</h3>
+                <p>Most real-time compositors (including WebGL and GPU blend units) expect premultiplied source colors for correct multi-layer results.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Conversion</h3>
+                <p>To convert: <code>premul = vec4(rgb * a, a)</code>. To reverse: <code>straight = vec4(premul.rgb / a, a)</code> (guard against dividing by zero).</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="msaa-coverage">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>MSAA estimates edge coverage by testing multiple sample points per pixel</h2>
+            <p>
+              Multi-Sample Anti-Aliasing (MSAA) is a hardware-accelerated technique for reducing jagged edges on geometry silhouettes.
+              Instead of shading every sub-pixel, MSAA evaluates the triangle coverage test at multiple sample positions within each pixel
+              (typically 2, 4, or 8 samples). The fragment shader runs once per pixel, but the coverage mask records which samples the
+              triangle actually covers. The final pixel color is weighted by how many samples passed. This smooths geometry edges without
+              multiplying the shading cost by the sample count.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="msaa-coverage-canvas" class="canvas-stage" aria-label="Zoomed pixel grid showing MSAA sample points and coverage estimation"></canvas>
+            <p class="canvas-caption">A zoomed pixel grid with sample points. The triangle edge crosses some pixels partially. MSAA counts how many samples each pixel covers to estimate edge softness.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Multiple sample positions per pixel</h3>
+                <p>Each pixel contains 2, 4, or 8 sample points at fixed offsets. The rasterizer tests each point against the triangle.</p>
+              </li>
+              <li>
+                <h3>Coverage mask determines blend weight</h3>
+                <p>If 3 out of 4 samples are inside the triangle, the pixel gets 75% of the fragment color and 25% of the background.</p>
+              </li>
+              <li>
+                <h3>Shading runs once, not per sample</h3>
+                <p>The fragment shader executes once per pixel. Only the coverage test is per-sample, keeping the cost manageable.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>MSAA limitation</h3>
+                <p>MSAA only smooths geometry edges (triangle boundaries). It does not help with aliasing inside the shader, such as high-frequency texture patterns or specular highlights.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Transparency interaction</h3>
+                <p>Alpha-to-coverage can use MSAA sample masks to approximate order-independent transparency for alpha-tested surfaces like foliage.</p>
               </article>
             </div>
           </div>
@@ -239,6 +402,53 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Build a compositing stack one layer at a time</h2>
+            <p>
+              This lab walks through the alpha compositing formula step by step. Each layer is added to the framebuffer in order.
+              Toggle between straight and premultiplied mode to see how the formula changes, and watch the intermediate pixel values
+              update as each layer is composited.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The canvas shows a compositing stack being built from back to front. Each step shows the current framebuffer state and the formula
+                being applied. Use the controls to adjust the layer being added and observe how the output changes.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Layer count</span>
+                  <input id="transparency-code-layers" type="range" min="1" max="4" value="3" />
+                </label>
+                <label class="control">
+                  <span>Source alpha</span>
+                  <input id="transparency-code-alpha" type="range" min="10" max="95" value="60" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Premultiplied mode</span>
+                  <input id="transparency-code-premul" type="checkbox" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Start with 1 layer. The framebuffer just shows the background color modified by one source-over blend.</li>
+                <li>Add more layers. Each one modifies the result of the previous composite, not the original background.</li>
+                <li>Toggle premultiplied mode. The formula text changes but the visual result should match when both pipelines are correct.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="transparency-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Step-by-step compositing stack visualization"></canvas>
+              <p class="canvas-caption">Each row is one compositing step. The formula and intermediate values are shown alongside the visual result.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -253,6 +463,10 @@
             <article class="checkpoint-card">
               <h3>Common mistake</h3>
               <p>Treating alpha as the same concept as pixel coverage and expecting one value to solve both problems.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Premultiplied alpha, MSAA, coverage mask, source-over, back-to-front sorting, alpha-to-coverage, straight alpha.</p>
             </article>
             <article class="checkpoint-card">
               <h3>Carry forward</h3>

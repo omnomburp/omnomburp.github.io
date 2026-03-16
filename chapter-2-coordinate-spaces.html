@@ -258,21 +258,78 @@
               <span class="step-number">1</span>
               <h3>Object space keeps modeling simple</h3>
               <p>A chair can be described around its own origin, regardless of where it later sits in a room.</p>
+              <p>
+                <strong>In practice:</strong> when a character equips a sword in an action RPG, the blade mesh is authored with its grip at the origin and the edge pointing along +Y. The artist never thinks about where the character stands in the world &mdash; they model the sword in isolation. At runtime, the engine looks up a "right-hand" bone socket (also defined in the character's object space) and parents the sword's transform to it. If the sword were authored in world space, you would need to know the character's exact position and rotation ahead of time, and every animation frame would invalidate those coordinates. Object space makes the problem <em>local</em>: the sword only cares about its own pivot, and the model matrix composes it into the scene later.
+              </p>
+              <p>
+                Any operation that is intrinsic to the asset &mdash; bounding-box computation, bone-relative offsets, procedural mesh deformation, LOD switching &mdash; belongs in object space because the answer does not depend on where the object ends up in the scene.
+              </p>
             </article>
             <article class="step-card">
               <span class="step-number">2</span>
               <h3>World space builds the scene</h3>
               <p>Models gain meaningful placement relative to one another: left, right, above, behind, and so on.</p>
+              <p>
+                <strong>In practice:</strong> consider an enemy guard in a stealth game. Every frame the AI system asks: "How far is the player from me? What angle are they at relative to my facing direction?" Both questions require the guard and the player to be expressed in the <em>same</em> coordinate system, and that system is world space. You take <code>playerWorld - guardWorld</code> to get a direction vector, dot it with the guard's forward vector to check the detection-cone angle, and compare the length against the detection radius.
+              </p>
+              <p>
+                If you tried this in object space, you would have two separate local frames with no relationship to each other. If you tried it in view space, the camera's position would pollute the distance calculation &mdash; a guard 5&nbsp;metres away would appear closer or farther depending on where the camera happens to be, which is nonsensical for AI logic. Any operation that requires relationships between multiple independent objects &mdash; physics collisions, spatial queries like raycasts and overlap tests, navigation meshes, audio attenuation by distance &mdash; must happen in world space because it is the only frame where all objects share a common origin.
+              </p>
+              <div class="canvas-card">
+                <canvas id="world-space-ai-canvas" class="canvas-stage canvas-stage-compact" style="height: 260px; min-height: 0" aria-label="World space AI detection cone demo"></canvas>
+                <p class="canvas-caption">The guard's detection cone and the distance check both require world space &mdash; the only frame where both actors share an origin.</p>
+              </div>
             </article>
             <article class="step-card">
               <span class="step-number">3</span>
               <h3>View space centers the camera</h3>
               <p>The camera transform is easier to reason about once the world is expressed relative to the eye.</p>
+              <p>
+                <strong>In practice:</strong> after the view transform, every vertex's Z coordinate is its distance from the camera along the camera's look direction. This makes depth-sorted rendering trivial: sort by view-space Z. It also makes fog calculation simple: the fog factor is <code>clamp((-viewZ - fogStart) / (fogEnd - fogStart), 0, 1)</code>. You read the depth directly off the coordinate.
+              </p>
+              <p>
+                If you computed fog in world space, you would need <code>length(objectWorld - cameraWorld)</code> for every fragment &mdash; an expensive per-pixel distance calculation. In view space, the Z component <em>is</em> the depth, already computed by the matrix multiply you were doing anyway. Another common use: HUD indicators. "Show an arrow pointing toward the objective" is easiest in view space &mdash; if the objective's view-space X is positive, the arrow points right; if negative, left. The camera's orientation is already baked in.
+              </p>
+              <p>
+                Any operation that depends on the camera's perspective &mdash; depth sorting, fog, screen-space effects, "is this object in front of me or behind me?" checks &mdash; belongs in view space because the camera is at the origin looking down &minus;Z, which makes those questions into simple coordinate reads.
+              </p>
             </article>
             <article class="step-card">
               <span class="step-number">4</span>
               <h3>Clip space prepares the divide</h3>
               <p>Projection first produces a homogeneous clip coordinate. Only after dividing by <code>w</code> do you land in normalized device coordinates.</p>
+              <p>
+                <strong>In practice:</strong> before submitting a draw call, the engine can transform an object's bounding sphere center into clip space and check: <code>|x| &lt;= w</code> and <code>|y| &lt;= w</code> and <code>near &lt;= z &lt;= w</code>. If the sphere fails this test (accounting for its radius), the entire object is off-screen and you skip the draw call entirely. This frustum cull is <em>much</em> cheaper than transforming every vertex.
+              </p>
+              <p>
+                The reason this works in clip space specifically (and not NDC) is that the perspective divide has not happened yet. The <code>w</code> component carries the depth scaling factor, and the comparison <code>|x| &lt;= w</code> is a single multiply-free test &mdash; it is the same as asking <code>|x/w| &lt;= 1</code> (the NDC test) but without doing the division. The GPU does the same thing internally for triangle clipping: it clips against the six planes of the clip-space cube using only additions and multiplies, never a divide. Clip space exists because the perspective divide is destructive &mdash; once you divide by <code>w</code>, you lose the ability to do linear interpolation across a triangle and you lose the depth information encoded in <code>w</code>. The GPU needs this intermediate checkpoint to clip triangles and set up perspective-correct interpolation, all before the divide happens.
+              </p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">5</span>
+              <h3>NDC is the resolution-independent screen</h3>
+              <p>After the divide by <code>w</code>, the point lives in a fixed <code>[-1, 1]</code> box that the viewport maps into pixels.</p>
+              <p>
+                <strong>In practice:</strong> a post-processing pass like screen-space ambient occlusion (SSAO) works entirely in this normalised screen space. For each pixel, it samples nearby depth values in a hemisphere, compares them, and darkens the pixel if it is occluded. The coordinates are resolution-independent &mdash; the same <code>[-1, 1]</code> box whether the window is 720p or 4K. The viewport transform (a simple scale and offset) maps NDC to actual pixel coordinates at the very end.
+              </p>
+              <p>
+                Another use: mouse picking. The mouse gives you pixel coordinates. You map them back to NDC with <code>ndcX = (mouseX / viewportWidth) * 2 - 1</code>, then unproject through the inverse projection matrix to get a ray into the scene. NDC is the bridge between "where on screen did the user click?" and "what direction in 3D does that correspond to?" Any operation that works with the final 2D layout of the scene but should not hard-code pixel dimensions &mdash; post-processing effects, mouse picking, UI overlay positioning, scissor regions &mdash; lives most naturally in NDC.
+              </p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">6</span>
+              <h3>Tangent space keeps surface detail portable</h3>
+              <p>Normal maps, parallax mapping, and anisotropic reflections all describe the surface relative to itself.</p>
+              <p>
+                <strong>In practice:</strong> a normal map stores per-texel surface perturbations, but those perturbations are expressed relative to the triangle's own surface &mdash; not the world. The tangent, bitangent, and geometric normal of each triangle form a local basis called tangent space. When the pixel shader reads a normal-map texel, it gets a tangent-space vector (usually close to <code>(0, 0, 1)</code>, meaning "mostly unchanged from the surface normal"). A small matrix called TBN converts that into world space for lighting.
+              </p>
+              <p>
+                If normal maps stored world-space normals instead, they would only be correct for one specific orientation of the mesh. The moment the character rotates, every normal-map texel would be wrong. Tangent space solves this the same way object space solves weapon attachment: it keeps the data <em>local to the surface</em>, and the TBN matrix bridges it into the shared world frame at runtime. You will see tangent space again in chapters on shaders and materials.
+              </p>
+              <div class="canvas-card">
+                <canvas id="tangent-space-intro-canvas" class="canvas-stage canvas-stage-compact" style="height: 260px; min-height: 0" aria-label="Tangent space TBN basis demo"></canvas>
+                <p class="canvas-caption">The tangent (T), bitangent (B), and normal (N) form a local frame on the surface. A normal-map sample is transformed from this frame into world space for lighting.</p>
+              </div>
             </article>
           </div>
         </section>

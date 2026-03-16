@@ -49,6 +49,7 @@
             <a href="#mental-model">Mental model</a>
             <a href="#raster">Rasterization flow</a>
             <a href="#ray">Ray tracing flow</a>
+            <a href="#ray-bounces">Ray bounces</a>
             <a href="#comparison">Comparison</a>
             <a href="#lab">Live lab</a>
             <a href="#code-lab">Guided code lab</a>
@@ -209,6 +210,22 @@
               </article>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="ray-bounces">
+          <div class="section-header">
+            <p class="eyebrow">Visual explainer</p>
+            <h2>A ray tracer follows light paths backward from the camera</h2>
+            <p>
+              The animation below shows the sequence that a ray tracer performs for a single pixel:
+              a primary ray from the camera finds the nearest surface, then a shadow ray checks light
+              visibility, and a reflection ray continues the path to a second surface.
+            </p>
+          </div>
+          <article class="canvas-card">
+            <canvas id="ray-bounce-canvas" class="canvas-stage" aria-label="Animated ray tracing bounce sequence"></canvas>
+            <p class="canvas-caption">Primary ray (yellow) hits a surface, shadow ray (orange dashed) checks the light, reflection ray (teal) bounces to a second surface.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="comparison">

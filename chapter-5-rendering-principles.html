@@ -49,6 +49,7 @@
             <a href="#pipeline">Mental model</a>
             <a href="#rendering-uses">More uses</a>
             <a href="#triangle-story">Triangle story</a>
+            <a href="#barycentric-interactive">Barycentric weights</a>
             <a href="#visibility-story">Visibility story</a>
             <a href="#frame">Frame walkthrough</a>
             <a href="#framebuffers">Framebuffers</a>
@@ -242,6 +243,23 @@
               </div>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="barycentric-interactive">
+          <div class="section-header">
+            <p class="eyebrow">Visual explainer</p>
+            <h2>Barycentric weights determine how vertex attributes blend across the triangle</h2>
+            <p>
+              Every point inside a triangle can be described as a weighted sum of its three vertices.
+              The weights — called barycentric coordinates — correspond to the fractional areas of the
+              three sub-triangles formed by splitting the original triangle at that point.
+              Move your cursor over the triangle to see the weights and the resulting interpolated color.
+            </p>
+          </div>
+          <article class="canvas-card">
+            <canvas id="barycentric-interactive-canvas" class="canvas-stage" aria-label="Interactive barycentric coordinate demo"></canvas>
+            <p class="canvas-caption">Hover or touch inside the triangle. The three weights (w0, w1, w2) sum to 1.0 and drive the blended color.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="visibility-story">

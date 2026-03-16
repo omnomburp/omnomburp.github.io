@@ -46,9 +46,14 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#game-intuition">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#bvh-traversal">BVH traversal</a>
             <a href="#scene-management">Scene management</a>
+            <a href="#lod-comparison">LOD comparison</a>
+            <a href="#frustum-test">Frustum testing</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -86,16 +91,47 @@
 
           <div class="formula-strip">
             <article class="formula-card">
-              <span class="formula-label">Visibility idea</span>
-              <code>outside frustum = skip draw</code>
+              <span class="formula-label">Frustum test</span>
+              <code>dot(plane_normal, center) + radius &gt; 0</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">LOD idea</span>
-              <code>farther object = cheaper proxy</code>
+              <span class="formula-label">LOD selection</span>
+              <code>screen_size = radius / distance</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Acceleration idea</span>
-              <code>reject groups before testing leaves</code>
+              <span class="formula-label">BVH skip</span>
+              <code>miss parent box = skip all children</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-intuition">
+          <div class="section-header">
+            <p class="eyebrow">Game intuition</p>
+            <h2>Every shipped game depends on not rendering what cannot be seen</h2>
+            <p>
+              Open-world games with thousands of objects, dense city scenes with millions of triangles, and battle royale maps with 100 players
+              all rely on acceleration and culling to hit their frame budgets. Without these systems, even powerful GPUs would choke on the
+              sheer submission cost of objects that contribute nothing to the final image.
+            </p>
+          </div>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h3>Open worlds</h3>
+              <p>A large terrain with forests, buildings, and NPCs. The camera sees a tiny fraction at any moment. Frustum culling and LOD keep the visible budget manageable.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Interior scenes</h3>
+              <p>Rooms connected by hallways. Occlusion culling skips entire rooms the camera cannot see through doorways, saving both GPU and CPU cost.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Ray tracing acceleration</h3>
+              <p>A ray tracer without a BVH tests every ray against every triangle. With a BVH, most triangles are skipped after a few box tests, making real-time ray tracing possible.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Streaming and LOD</h3>
+              <p>Distant mountains load low-poly meshes. As the player approaches, higher detail streams in. LOD systems manage this transition so pop-in is minimized.</p>
             </article>
           </div>
         </section>
@@ -125,8 +161,56 @@
             <article class="step-card">
               <span class="step-number">4</span>
               <h3>Track the cost in scene-space terms</h3>
-              <p>Triangle counts, instance counts, and traversal depth are often better diagnostics than “the frame feels slow.”</p>
+              <p>Triangle counts, instance counts, and traversal depth are often better diagnostics than "the frame feels slow."</p>
             </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="bvh-traversal">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>A BVH organizes objects into a tree of bounding boxes for fast rejection</h2>
+            <p>
+              A Bounding Volume Hierarchy (BVH) is a tree structure where each node contains a bounding box that encloses all objects
+              in its subtree. The root box contains the entire scene. Each internal node splits its objects into two groups, each with
+              its own tighter bounding box. To test a ray or frustum against the scene, start at the root: if the query misses the root
+              box, the entire scene is skipped. If it hits, descend to the children and repeat. Most branches are rejected early, so a
+              scene with millions of triangles can be queried with only tens of box tests. The key insight is that missing a parent box
+              lets you skip all the children at once.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="bvh-traversal-canvas" class="canvas-stage" aria-label="2D BVH tree with animated ray showing skip and test decisions at each node"></canvas>
+            <p class="canvas-caption">A ray traverses the BVH. Green boxes are hit and explored further. Red boxes are missed and their entire subtree is skipped. The triangle hit count stays low because most of the scene is rejected by box tests.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Build phase: split objects into groups</h3>
+                <p>Choose a split axis and position that produces two groups with tight bounding boxes. Common strategies: surface area heuristic (SAH), median split, or spatial median.</p>
+              </li>
+              <li>
+                <h3>Each node stores only a bounding box and child pointers</h3>
+                <p>Leaf nodes point to actual geometry. Internal nodes just define the box and link to children. The tree is typically 10-20 levels deep for millions of triangles.</p>
+              </li>
+              <li>
+                <h3>Traversal tests the ray against boxes, not triangles</h3>
+                <p>A ray-box test is cheap (a few comparisons). Only when a leaf is reached does the ray test against actual triangles. Most triangles are never tested.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>BVH vs grid vs octree</h3>
+                <p>BVHs adapt well to non-uniform object distributions. Uniform grids waste memory in sparse areas. Octrees are a compromise but BVHs are the standard for ray tracing.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Cost model</h3>
+                <p>Without a BVH, testing N triangles costs O(N). With a balanced BVH, average cost is O(log N). This is the difference between real-time and minutes per frame.</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -175,6 +259,42 @@
               </article>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="lod-comparison">
+          <div class="section-header">
+            <p class="eyebrow">Concept isolation</p>
+            <h2>The same object at different detail levels balances quality against cost</h2>
+            <p>
+              LOD systems store multiple versions of the same mesh at decreasing triangle counts. The renderer picks the version
+              whose detail matches the object's screen-space size. A character at 2000 triangles looks the same as one at 20,000
+              when it occupies 30 pixels on screen, but costs 10x less to render. The challenge is making the transitions invisible:
+              blending between levels, matching silhouettes, and ensuring shading stays consistent.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="lod-comparison-canvas" class="canvas-stage" aria-label="Same object at three detail levels side by side with triangle count readouts"></canvas>
+            <p class="canvas-caption">Three versions of the same object. High detail (left) for close-up views, medium (center) for mid-range, and low (right) for distant rendering. Triangle counts shown below each.</p>
+          </article>
+        </section>
+
+        <section class="panel reveal-block" id="frustum-test">
+          <div class="section-header">
+            <p class="eyebrow">Concept isolation</p>
+            <h2>Frustum culling tests an object's bounding box against six planes</h2>
+            <p>
+              The view frustum is defined by six planes: near, far, left, right, top, and bottom. To test whether an object is visible,
+              check its axis-aligned bounding box (AABB) against each plane. If the box is entirely on the outside of any plane, the object
+              is outside the frustum and can be skipped. The test is a few dot products per plane, making it very cheap compared to actually
+              rendering the object. The demo below shows a single object with its AABB and the six frustum plane tests.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="frustum-test-canvas" class="canvas-stage" aria-label="Single object with AABB showing the six frustum plane tests for inside/outside determination"></canvas>
+            <p class="canvas-caption">The bounding box is tested against each frustum plane. Green planes pass (box is on the inside). Red planes fail (box is outside). One red plane is enough to cull the entire object.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="lab">
@@ -239,6 +359,53 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Step through a frustum culling test one plane at a time</h2>
+            <p>
+              This lab shows the frustum culling test in detail. An object's AABB is tested against each of the six
+              frustum planes sequentially. As each plane is tested, you can see whether the box passes or fails,
+              and the final culling decision is shown.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                Move the object around with the position sliders and watch the plane tests update.
+                When the object crosses outside any frustum plane, it gets culled.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Object X</span>
+                  <input id="acceleration-code-x" type="range" min="0" max="100" value="50" />
+                </label>
+                <label class="control">
+                  <span>Object Y</span>
+                  <input id="acceleration-code-y" type="range" min="0" max="100" value="50" />
+                </label>
+                <label class="control">
+                  <span>Frustum angle</span>
+                  <input id="acceleration-code-angle" type="range" min="0" max="100" value="30" />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Place the object inside the frustum. All six plane tests should pass (green).</li>
+                <li>Move the object outside one edge. That plane test fails (red) and the object is culled.</li>
+                <li>Rotate the frustum to see how the plane orientations change relative to the object.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="acceleration-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Step-by-step frustum culling test visualization"></canvas>
+              <p class="canvas-caption">Each frustum plane is tested against the object's bounding box. One failure is enough to cull.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -253,6 +420,10 @@
             <article class="checkpoint-card">
               <h3>Common mistake</h3>
               <p>Thinking optimization only starts after shading. Many of the highest-value savings happen before detailed shading work even begins.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>BVH, AABB, frustum culling, LOD, surface area heuristic, bounding volume, occlusion culling, broad phase, screen-space size.</p>
             </article>
             <article class="checkpoint-card">
               <h3>Where to go next</h3>

@@ -46,9 +46,14 @@
         <nav class="aside-card" aria-label="On this page">
           <p class="sidebar-label">On this page</p>
           <div class="outline-list">
+            <a href="#game-intuition">Game intuition</a>
             <a href="#mental-model">Mental model</a>
+            <a href="#gimbal-lock">Gimbal lock</a>
+            <a href="#lerp-vs-slerp">Lerp vs slerp</a>
             <a href="#deformation-story">Deformation story</a>
+            <a href="#skinning-weights">Skinning weights</a>
             <a href="#lab">Live lab</a>
+            <a href="#code-lab">Code lab</a>
             <a href="#checkpoints">Checkpoints</a>
           </div>
         </nav>
@@ -76,7 +81,7 @@
             </article>
             <article class="mini-card">
               <h2>Keyframes</h2>
-              <p>Animation stores important poses and fills the motion between them with interpolation rules. Positions often use <code>lerp</code>; rotations usually use quaternion interpolation.</p>
+              <p>Animation stores important poses and fills the motion between them with interpolation rules. Positions often use <code>lerp</code>; rotations usually use quaternion interpolation (<code>slerp</code>).</p>
             </article>
             <article class="mini-card">
               <h2>Skinning</h2>
@@ -90,12 +95,43 @@
               <code>global = parent * local</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">One position blend</span>
-              <code>position = lerp(A, B, t)</code>
+              <span class="formula-label">Slerp</span>
+              <code>q(t) = q0 * (q0^-1 * q1)^t</code>
             </article>
             <article class="formula-card">
-              <span class="formula-label">Skinning idea</span>
-              <code>vertex = sum(weight_i * bone_i(vertex))</code>
+              <span class="formula-label">Skinning</span>
+              <code>v' = sum(w_i * M_i * v)</code>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="game-intuition">
+          <div class="section-header">
+            <p class="eyebrow">Game intuition</p>
+            <h2>Why animation is a core system, not just character motion</h2>
+            <p>
+              Almost everything that moves in a game uses the same hierarchy and interpolation ideas. Character rigs drive walk cycles and combat moves.
+              Camera rigs create cinematic sequences. Vehicle suspensions use parent-child chains. UI elements animate with keyframed transitions.
+              The math behind all of these is the same transform hierarchy and interpolation system.
+            </p>
+          </div>
+
+          <div class="goal-grid">
+            <article class="mini-card">
+              <h3>Character rigs</h3>
+              <p>A humanoid skeleton with 50-100 joints drives walk cycles, attacks, and idles. Each joint is a child of the one above it in the body.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Facial animation</h3>
+              <p>Blend shapes or bone-driven face rigs animate expressions. The jaw is a child of the head; the lips follow the jaw. Hierarchies keep the face coherent.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Vehicles and machines</h3>
+              <p>Wheels are children of the chassis. Turrets are children of the hull. Doors are children of the frame. One hierarchy drives the whole assembly.</p>
+            </article>
+            <article class="mini-card">
+              <h3>Procedural and physics-driven motion</h3>
+              <p>Ragdoll physics, IK solvers, and procedural animation all feed into the same skeleton system. The output is still bone transforms that the skinning system consumes.</p>
             </article>
           </div>
         </section>
@@ -130,6 +166,73 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="gimbal-lock">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>Gimbal lock happens when two rotation axes collapse into the same plane</h2>
+            <p>
+              Euler angles represent a 3D rotation as three sequential rotations around fixed axes (e.g., X then Y then Z).
+              When the middle rotation reaches 90 degrees, the first and third axes align, and the system loses one degree of
+              freedom. Trying to rotate around the lost axis produces unexpected wobble or requires jumping through discontinuous
+              angle values. This is <strong>gimbal lock</strong>. It is not a bug in the math; it is a fundamental limitation of
+              representing 3D rotations as three ordered angles. Quaternions avoid it because they represent rotation as a single
+              axis-angle pair encoded in four components, with no sequential ordering that can degenerate.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="gimbal-lock-canvas" class="canvas-stage" aria-label="Euler angle rotation demo showing gimbal lock when middle axis reaches 90 degrees, with quaternion comparison"></canvas>
+            <p class="canvas-caption">Left: Euler angles. Tilt the middle axis toward 90 degrees and watch two rings collapse onto each other, losing a rotation axis. Right: the same target rotation as a quaternion, with no axis collapse.</p>
+          </article>
+
+          <div class="two-column">
+            <ol class="walkthrough-list">
+              <li>
+                <h3>Three sequential rotations share axis space</h3>
+                <p>Each Euler rotation happens around one axis. When the second rotation is near 90 degrees, the first and third axes become parallel.</p>
+              </li>
+              <li>
+                <h3>One degree of freedom disappears</h3>
+                <p>With two axes aligned, rotations around axis 1 and axis 3 produce the same motion. The system can only rotate in two independent directions.</p>
+              </li>
+              <li>
+                <h3>Quaternions encode rotation differently</h3>
+                <p>A quaternion stores an axis and an angle as four numbers (x, y, z, w). There is no ordering of axes that can degenerate.</p>
+              </li>
+            </ol>
+
+            <div class="note-stack">
+              <article class="mini-card">
+                <h3>When it matters most</h3>
+                <p>Gimbal lock causes the worst artifacts during animation interpolation. A character's shoulder rotating near 90 degrees pitch can snap or wobble if stored as Euler angles.</p>
+              </article>
+              <article class="mini-card">
+                <h3>Industry practice</h3>
+                <p>Game engines store joint rotations as quaternions internally. Euler angles are sometimes shown in the editor for artist convenience, but the runtime always uses quaternions.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="lerp-vs-slerp">
+          <div class="section-header">
+            <p class="eyebrow">Deep dive</p>
+            <h2>Slerp keeps rotation speed constant; lerp takes a shortcut through the sphere</h2>
+            <p>
+              Linear interpolation (lerp) works well for positions: it moves in a straight line at constant speed. But rotations
+              live on the surface of a sphere. Lerp between two quaternions cuts through the interior of the sphere, producing
+              non-uniform speed and a shorter path. Spherical linear interpolation (slerp) follows the great-circle arc on the
+              sphere surface, maintaining constant angular velocity. The difference is most visible when interpolating large rotations
+              or when smooth motion matters (camera paths, character joints).
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="lerp-vs-slerp-canvas" class="canvas-stage" aria-label="Two rotating objects compared: one interpolated with lerp (variable speed) and one with slerp (constant speed arc)"></canvas>
+            <p class="canvas-caption">Top: lerp cuts through the sphere, causing variable speed (fast in the middle, slow at endpoints). Bottom: slerp follows the arc, maintaining constant angular velocity.</p>
+          </article>
+        </section>
+
         <section class="panel reveal-block" id="deformation-story">
           <div class="section-header">
             <p class="eyebrow">Deformation story</p>
@@ -144,7 +247,7 @@
               </li>
               <li>
                 <h3>Keyframes solve timing</h3>
-                <p>The animator stores important poses, then the system interpolates in-between values so motion feels continuous. Translations and scales are often lerped; rotations are usually blended with quaternion interpolation.</p>
+                <p>The animator stores important poses, then the system interpolates in-between values so motion feels continuous. Translations and scales are often lerped; rotations are usually blended with slerp to avoid gimbal lock and ensure constant angular speed.</p>
               </li>
               <li>
                 <h3>Skinning solves surface continuity</h3>
@@ -162,12 +265,12 @@
                 <p>The skeleton poses correctly, but the mesh is attached with hard ownership so the elbow collapses into obvious rigid chunks.</p>
               </article>
               <article class="mini-card">
-                <h3>Where quaternions enter later</h3>
-                <p>This chapter stays conceptual. Production systems often interpolate rotations with quaternions to avoid the artifacts that simple component-wise Euler blending can cause in 3D joints.</p>
+                <h3>Quaternion interpolation</h3>
+                <p>Production animation systems use slerp (spherical linear interpolation) for joint rotations. Slerp follows the shortest arc on the rotation sphere, avoiding the variable-speed artifacts that naive component-wise lerp would cause.</p>
               </article>
               <article class="mini-card">
-                <h3>What “weights” mean</h3>
-                <p>They are just fractions that tell each vertex how much authority each nearby bone has over its final position.</p>
+                <h3>What "weights" mean</h3>
+                <p>They are just fractions that tell each vertex how much authority each nearby bone has over its final position. Weights per vertex always sum to 1.0.</p>
               </article>
               <article class="mini-card">
                 <h3>Good debugging move</h3>
@@ -175,6 +278,25 @@
               </article>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal-block" id="skinning-weights">
+          <div class="section-header">
+            <p class="eyebrow">Concept isolation</p>
+            <h2>Skinning weights control how much each bone influences each vertex</h2>
+            <p>
+              Each vertex on the mesh stores a small list of bone indices and corresponding weights. When the skeleton is posed,
+              each vertex computes its final position as a weighted blend of the bone transforms that influence it:
+              <code>v' = w0 * M0 * v + w1 * M1 * v + ...</code> where M_i is the bone's current transform relative to its bind pose
+              and w_i are the weights (summing to 1.0). The heat map below shows bone influence painted onto an arm mesh. Vertices
+              near a joint receive significant weight from both adjacent bones, creating a smooth blend zone.
+            </p>
+          </div>
+
+          <article class="canvas-card">
+            <canvas id="skinning-weights-canvas" class="canvas-stage" aria-label="Heat map overlay on arm mesh showing bone influence weights per vertex"></canvas>
+            <p class="canvas-caption">Colors represent bone influence. Pure colors mean one bone dominates. Blended colors near joints show where two bones share influence, creating smooth deformation.</p>
+          </article>
         </section>
 
         <section class="panel reveal-block" id="lab">
@@ -239,6 +361,53 @@
           </div>
         </section>
 
+        <section class="panel reveal-block" id="code-lab">
+          <div class="section-header">
+            <p class="eyebrow">Guided code lab</p>
+            <h2>Explore how bone weights shape the deformation zone</h2>
+            <p>
+              This lab lets you paint bone weights interactively and see how the deformation changes.
+              Adjust the blend zone width to control how far each bone's influence extends, and watch
+              how the mesh deforms differently near joints.
+            </p>
+          </div>
+
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The arm mesh is shown with a heat map of bone weights. Adjust the blend width to see how wider blend zones
+                create smoother deformation at joints, and narrower zones create sharper (more rigid) bends.
+              </p>
+
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Pose angle</span>
+                  <input id="animation-code-pose" type="range" min="0" max="100" value="65" />
+                </label>
+                <label class="control">
+                  <span>Blend zone width</span>
+                  <input id="animation-code-blend" type="range" min="5" max="100" value="50" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show weight colors</span>
+                  <input id="animation-code-colors" type="checkbox" checked />
+                </label>
+              </div>
+
+              <ul class="bullet-list">
+                <li>Set blend zone narrow. The deformation is sharper at joints, closer to rigid ownership.</li>
+                <li>Widen the blend zone. The elbow area smooths out as both adjacent bones share more influence.</li>
+                <li>Toggle weight colors to see the raw influence values overlaid on the mesh.</li>
+              </ul>
+            </div>
+
+            <div class="canvas-card">
+              <canvas id="animation-code-canvas" class="canvas-stage canvas-stage-compact" aria-label="Interactive bone weight painting and deformation demo"></canvas>
+              <p class="canvas-caption">The heat map shows bone influence. Wider blend zones create smoother deformation at the cost of less precise joint control.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="panel reveal-block" id="checkpoints">
           <div class="section-header">
             <p class="eyebrow">Checkpoints</p>
@@ -253,6 +422,10 @@
             <article class="checkpoint-card">
               <h3>Common mistake</h3>
               <p>Thinking the skeleton and the mesh are the same data. The rig drives motion; the mesh is the visible surface that interprets it.</p>
+            </article>
+            <article class="checkpoint-card">
+              <h3>Vocabulary to keep</h3>
+              <p>Gimbal lock, quaternion, slerp, lerp, bone weights, bind pose, linear blend skinning, forward kinematics, joint hierarchy.</p>
             </article>
             <article class="checkpoint-card">
               <h3>Carry forward</h3>

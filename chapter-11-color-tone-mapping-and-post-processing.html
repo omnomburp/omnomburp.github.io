@@ -48,6 +48,7 @@
           <div class="outline-list">
             <a href="#mental-model">Mental model</a>
             <a href="#display-story">Display story</a>
+            <a href="#tone-curve">Tone curve</a>
             <a href="#pipeline">Step by step</a>
             <a href="#lab">Live lab</a>
             <a href="#code-lab">Guided code lab</a>
@@ -188,6 +189,51 @@
                   </article>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal-block" id="tone-curve">
+          <div class="section-header">
+            <p class="eyebrow">Visual explainer</p>
+            <h2>Tone mapping compresses HDR values into the displayable range</h2>
+            <p>
+              Linear rendering can produce values far above 1.0 — a sunlit surface might be 4 or 5 times
+              brighter than a shaded wall. Tone mapping applies a curve that compresses those high values
+              while preserving contrast in the mid-range. Different operators (Reinhard, ACES) shape that
+              compression differently.
+            </p>
+          </div>
+          <div class="lab-layout">
+            <div class="lab-copy">
+              <p>
+                The graph shows input HDR values on the x-axis and mapped display values on the y-axis.
+                The dashed white line is the identity (no compression). Toggle Reinhard and ACES curves
+                to compare how each operator handles highlights. The exposure slider scales all input values.
+              </p>
+              <div class="controls-grid">
+                <label class="control">
+                  <span>Exposure</span>
+                  <input id="tone-curve-exposure" type="range" min="20" max="300" value="100" />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show Reinhard</span>
+                  <input id="tone-curve-reinhard" type="checkbox" checked />
+                </label>
+                <label class="control control-toggle">
+                  <span>Show ACES</span>
+                  <input id="tone-curve-aces" type="checkbox" />
+                </label>
+              </div>
+              <ul class="bullet-list">
+                <li>With default exposure, Reinhard gently compresses highlights toward 1.0 but never quite reaches it.</li>
+                <li>Toggle ACES on to see the filmic S-curve: darker shadows, punchier midtones, and a more aggressive highlight rolloff.</li>
+                <li>Push exposure above 2× and watch both curves compress harder to keep everything displayable.</li>
+              </ul>
+            </div>
+            <div class="canvas-card">
+              <canvas id="tone-curve-canvas" class="canvas-stage canvas-stage-compact" aria-label="Tone mapping curve comparison"></canvas>
+              <p class="canvas-caption">Reinhard (teal) and ACES (orange) shape the HDR-to-display mapping differently. Sample dots show where typical scene values land on each curve.</p>
             </div>
           </div>
         </section>
